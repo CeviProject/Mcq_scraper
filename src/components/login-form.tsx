@@ -93,7 +93,6 @@ export default function LoginForm() {
                             }
                         }
                     }}
-                    providers={['google', 'github']}
                 />
             </CardContent>
         </Card>
