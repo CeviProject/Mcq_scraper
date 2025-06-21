@@ -128,6 +128,28 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
             throw new Error("Document not found or you don't have permission to delete it.");
         }
         
+        const { data: questionIds, error: questionIdsError } = await supabase
+            .from('questions')
+            .select('id')
+            .eq('document_id', documentId);
+
+        if (questionIdsError) {
+            throw new Error(`Failed to retrieve associated questions: ${questionIdsError.message}`);
+        }
+
+        if (questionIds && questionIds.length > 0) {
+            const idsToDelete = questionIds.map(q => q.id);
+            
+            const { error: attemptsError } = await supabase
+                .from('test_attempts')
+                .delete()
+                .in('question_id', idsToDelete);
+
+            if (attemptsError) {
+                throw new Error(`Failed to delete associated test history: ${attemptsError.message}`);
+            }
+        }
+        
         const { error: questionsError } = await supabase
             .from('questions')
             .delete()
