@@ -36,10 +36,10 @@ const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ data, title = "Acti
 
 
   const getColor = (count: number) => {
-    if (count === 0) return 'bg-muted/50';
-    if (count <= 1) return 'bg-primary/20';
-    if (count <= 3) return 'bg-primary/40';
-    if (count <= 5) return 'bg-primary/70';
+    if (count === 0) return 'bg-secondary';
+    if (count <= 1) return 'bg-primary/40';
+    if (count <= 3) return 'bg-primary/60';
+    if (count <= 5) return 'bg-primary/80';
     return 'bg-primary';
   };
 
