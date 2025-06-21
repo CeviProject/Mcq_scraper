@@ -1,5 +1,7 @@
+
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import type { CookieOptions } from '@supabase/supabase-js';
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -26,54 +28,40 @@ export async function middleware(request: NextRequest) {
         get(name: string) {
           return request.cookies.get(name)?.value
         },
-        set(name: string, value: string, options) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({ name, value, ...options });
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
+          });
+          response.cookies.set({ name, value, ...options });
         },
-        remove(name: string, options) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set({ name, value: '', ...options });
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
-          })
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          });
+          response.cookies.set({ name, value: '', ...options });
         },
       },
     }
-  )
+  );
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session && request.nextUrl.pathname !== '/login') {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // if user is signed in and the current path is /login, redirect the user to /
+  if (user && request.nextUrl.pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url))
   }
-  
-  if (session && request.nextUrl.pathname === '/login') {
-      return NextResponse.redirect(new URL('/', request.url));
+
+  // if user is not signed in and the current path is not /login, redirect the user to /login
+  if (!user && request.nextUrl.pathname !== '/login') {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response
