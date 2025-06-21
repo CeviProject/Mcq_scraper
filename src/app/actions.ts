@@ -29,7 +29,6 @@ async function getApiKey(): Promise<string | undefined> {
 
     const { data: profile } = await supabase.from('profiles').select('gemini_api_key').eq('id', user.id).single();
     
-    // Returns user's key if available, otherwise undefined (which will cause fallback to developer key in .env.local)
     return profile?.gemini_api_key || undefined;
 }
 
@@ -58,7 +57,6 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
     
     const segResult = await contentSegregation({ pdfDataUri: input.pdfDataUri, apiKey });
     
-    // Save document to DB
     const { data: docData, error: docError } = await supabase
         .from('documents')
         .insert({ user_id: user.id, source_file: input.fileName, theory: segResult.theory })
@@ -70,23 +68,25 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
     }
     
     let newQuestionsData: Question[] = [];
-    const questionsToInsert = segResult.questions
-      .filter(q => q.questionText && q.questionText.length > 5)
-      .map(q => ({
-        document_id: docData.id,
-        user_id: user.id,
-        text: q.questionText,
-        options: q.options,
-        topic: q.topic || 'Uncategorized',
-      }));
+    if (segResult.questions && segResult.questions.length > 0) {
+        const questionsToInsert = segResult.questions
+          .filter(q => q.questionText && q.questionText.length > 5)
+          .map(q => ({
+            document_id: docData.id,
+            user_id: user.id,
+            text: q.questionText,
+            options: q.options,
+            topic: q.topic || 'Uncategorized',
+          }));
 
-    if (questionsToInsert.length > 0) {
-        const { data: insertedQuestions, error: qError } = await supabase.from('questions').insert(questionsToInsert).select();
-        if (qError) {
-          await supabase.from('documents').delete().eq('id', docData.id);
-          throw new Error(`Failed to save questions: ${qError.message}`);
+        if (questionsToInsert.length > 0) {
+            const { data: insertedQuestions, error: qError } = await supabase.from('questions').insert(questionsToInsert).select();
+            if (qError) {
+              await supabase.from('documents').delete().eq('id', docData.id);
+              throw new Error(`Failed to save questions: ${qError.message}`);
+            }
+            newQuestionsData = insertedQuestions as Question[];
         }
-        newQuestionsData = insertedQuestions as Question[];
     }
     
     return { document: docData as Document, questions: newQuestionsData };
@@ -117,7 +117,6 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
             throw new Error("Authentication error: You must be logged in to delete documents.");
         }
 
-        // First, verify the user owns the document
         const { data: doc, error: docError } = await supabase
             .from('documents')
             .select('id')
@@ -129,12 +128,6 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
             throw new Error("Document not found or you don't have permission to delete it.");
         }
         
-        // Note: For full robustness, the database should have ON DELETE CASCADE 
-        // constraints on foreign keys pointing to the documents table.
-        // We will proceed by deleting questions first. This will fail if test_attempts
-        // refer to them and there's no cascade delete set up.
-        
-        // Delete associated questions first
         const { error: questionsError } = await supabase
             .from('questions')
             .delete()
@@ -144,7 +137,6 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
             throw new Error(`Failed to delete associated questions: ${questionsError.message}`);
         }
 
-        // Then, delete the document itself
         const { error: documentError } = await supabase
             .from('documents')
             .delete()
@@ -161,6 +153,46 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
         return { error: error.message || 'Failed to delete document. Please try again.' };
     }
 }
+
+export async function renameDocumentAction({ documentId, newName }: { documentId: string; newName: string }): Promise<{ updatedDocument: Document } | { error: string }> {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value
+                },
+            },
+        }
+    );
+     try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error("Authentication error.");
+        }
+
+        const { data: updatedDoc, error } = await supabase
+            .from('documents')
+            .update({ source_file: newName })
+            .eq('id', documentId)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+        
+        if (error) {
+            throw new Error(`Failed to rename document: ${error.message}`);
+        }
+        
+        return { updatedDocument: updatedDoc as Document };
+
+    } catch (error: any) {
+        console.error('Error renaming document:', error);
+        return { error: error.message || 'Failed to rename document.' };
+    }
+}
+
 
 export async function getSolutionAction(input: Omit<GetSolutionInput, 'apiKey'>): Promise<GetSolutionOutput | { error: string }> {
     try {
@@ -208,9 +240,43 @@ export async function generateTestFeedbackAction(input: Omit<GenerateTestFeedbac
 
 
 export async function batchSolveQuestionsAction(input: Omit<BatchSolveInput, 'apiKey'>): Promise<BatchSolveOutput | { error: string }> {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: { get: (name: string) => cookieStore.get(name)?.value },
+        }
+    );
+
     try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error("Authentication error: You must be logged in.");
+        }
+
         const apiKey = await getApiKey();
         const result = await batchSolveQuestions({ ...input, apiKey });
+
+        if (result.solvedQuestions && result.solvedQuestions.length > 0) {
+            const updates = result.solvedQuestions.map(sq => ({
+                id: sq.id,
+                solution: sq.solution,
+                correct_option: sq.correctOption,
+                difficulty: sq.difficulty,
+                user_id: user.id,
+            }));
+
+            const { error: updateError } = await supabase.from('questions').upsert(updates);
+            if (updateError) {
+                // The RLS policy message is not very user-friendly, so we provide a clearer one.
+                if (updateError.message.includes('violates row-level security policy')) {
+                     throw new Error("Database security error: You do not have permission to update these questions.");
+                }
+                throw updateError;
+            }
+        }
+        
         return result;
     } catch (error: any) {
         console.error('Error batch solving questions:', error);

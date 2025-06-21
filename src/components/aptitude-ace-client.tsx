@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2 } from 'lucide-react';
 import { Document, Question, TestResult, ChatMessage, Test, Profile } from '@/lib/types';
-import { segregateContentAction, deleteDocumentAction } from '@/app/actions';
+import { segregateContentAction, deleteDocumentAction, renameDocumentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,6 @@ import SettingsSheet from './settings-sheet';
 import { createClient } from '@/lib/supabase';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
-// Create the Supabase client once at the module level
-// It's safe to assume config is valid here because page.tsx checks it.
 const supabase: SupabaseClient = createClient();
 
 export default function AptitudeAceClient({ session, profile: initialProfile }: { session: Session | null, profile: Profile | null }) {
@@ -38,7 +36,6 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
   
   const { toast } = useToast();
 
-  // Initial data fetch and subscription setup
   useEffect(() => {
     const fetchData = async () => {
       if (!session) {
@@ -77,7 +74,6 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
   }, [session, toast]);
   
   useEffect(() => {
-    // Theme logic from localStorage
     const storedTheme = localStorage.getItem('aptitude-ace-theme') || 'dark';
     setTheme(storedTheme);
     document.documentElement.classList.remove('light', 'dark');
@@ -95,7 +91,6 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
   const handleTestComplete = useCallback(async (result: TestResult) => {
     if (!session) return;
     
-    // 1. Insert into 'tests' table
     const { data: testData, error: testError } = await supabase
       .from('tests')
       .insert({
@@ -112,7 +107,6 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
       return;
     }
     
-    // 2. Prepare and insert into 'test_attempts'
     const attempts = result.questions.map(q => {
       const isCorrect = normalizeOption(result.userAnswers[q.id] || '') === normalizeOption(q.correct_option || '');
       return {
@@ -126,7 +120,6 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     const { error: attemptsError } = await supabase.from('test_attempts').insert(attempts);
     if(attemptsError) {
        toast({ variant: 'destructive', title: 'Error saving test attempts', description: attemptsError?.message });
-       // Note: might want to delete the parent 'test' record here for consistency
     }
 
     setTestHistory(prev => [testData, ...prev]);
@@ -211,6 +204,23 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     }
   }, [session, toast]);
 
+ const handleDocumentRename = useCallback(async (documentId: string, newName: string) => {
+    if (!session) {
+        toast({ variant: "destructive", title: "You must be logged in to rename files." });
+        return;
+    }
+    const result = await renameDocumentAction({ documentId, newName });
+
+    if ('error' in result) {
+        toast({ variant: "destructive", title: "Error renaming document", description: result.error });
+    } else {
+        const { updatedDocument } = result;
+        setDocuments(prev => prev.map(d => d.id === documentId ? { ...d, source_file: updatedDocument.source_file } : d));
+        setQuestions(prev => prev.map(q => q.document_id === documentId ? { ...q, sourceFile: updatedDocument.source_file } : q));
+        toast({ title: 'Document Renamed' });
+    }
+  }, [session, toast]);
+
 
   const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
     const { id, ...updateData } = updatedQuestion;
@@ -223,16 +233,10 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     }
   }, [toast]);
   
-  const handleQuestionsUpdate = useCallback(async (updates: (Partial<Question> & { id: string })[]) => {
-    const { error } = await supabase.from('questions').upsert(updates);
-    
-    if (error) {
-        toast({ variant: 'destructive', title: 'Error batch updating questions', description: error.message });
-    } else {
-        const updatesMap = new Map(updates.map(u => [u.id, u]));
-        setQuestions(prev => prev.map(q => updatesMap.has(q.id) ? { ...q, ...updatesMap.get(q.id)! } : q));
-    }
-  }, [toast]);
+  const handleQuestionsUpdate = useCallback((updates: (Partial<Question> & { id: string })[]) => {
+    const updatesMap = new Map(updates.map(u => [u.id, u]));
+    setQuestions(prev => prev.map(q => updatesMap.has(q.id) ? { ...q, ...updatesMap.get(q.id)! } : q));
+  }, []);
 
   const handleProfileUpdate = (newProfile: Profile) => {
     setProfile(newProfile);
@@ -286,7 +290,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
             />
           </TabsContent>
           <TabsContent value="theory" className="mt-6">
-            <TheoryZoneTab documents={documents} onDocumentDelete={handleDocumentDelete} />
+            <TheoryZoneTab documents={documents} onDocumentDelete={handleDocumentDelete} onDocumentRename={handleDocumentRename} />
           </TabsContent>
           <TabsContent value="questions" className="mt-6">
             <QuestionBankTab 

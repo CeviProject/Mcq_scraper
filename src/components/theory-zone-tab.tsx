@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Document } from '@/lib/types';
-import { BookOpen, FileText, Trash2 } from 'lucide-react';
+import { BookOpen, FileText, Pencil, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -22,18 +22,73 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+
+function RenameDialog({ document, onDocumentRename, children }: { document: Document, onDocumentRename: (documentId: string, newName: string) => void, children: React.ReactNode }) {
+    const [newName, setNewName] = useState(document.source_file);
+    const [isOpen, setIsOpen] = useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newName.trim() && newName.trim() !== document.source_file) {
+            onDocumentRename(document.id, newName.trim());
+        }
+        setIsOpen(false);
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>{children}</DialogTrigger>
+            <DialogContent>
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Rename Document</DialogTitle>
+                        <DialogDescription>
+                            Enter a new name for the document "{document.source_file}".
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label htmlFor="new-name" className="sr-only">New Name</Label>
+                        <Input 
+                            id="new-name"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                        <Button type="submit">Save</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 interface TheoryZoneTabProps {
   documents: Document[];
   onDocumentDelete: (documentId: string) => void;
+  onDocumentRename: (documentId: string, newName: string) => void;
 }
 
-export default function TheoryZoneTab({ documents, onDocumentDelete }: TheoryZoneTabProps) {
+export default function TheoryZoneTab({ documents, onDocumentDelete, onDocumentRename }: TheoryZoneTabProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(documents.length > 0 ? documents[0].source_file : null);
 
   const selectedContent = documents.find(c => c.source_file === selectedFile);
   
-  // When a document is deleted, if it was the selected one, select the first available one.
   React.useEffect(() => {
     if (documents.length > 0 && !documents.some(d => d.source_file === selectedFile)) {
       setSelectedFile(documents[0].source_file);
@@ -81,27 +136,34 @@ export default function TheoryZoneTab({ documents, onDocumentDelete }: TheoryZon
                                     <FileText className="w-4 h-4 mr-2 shrink-0" />
                                     <span className="truncate">{content.source_file}</span>
                                 </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Trash2 className="w-4 h-4 text-destructive" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the document "{content.source_file}" and all of its associated questions.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => onDocumentDelete(content.id)} className={buttonVariants({ variant: "destructive" })}>
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                               <div className="flex shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <RenameDialog document={content} onDocumentRename={onDocumentRename}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <Pencil className="w-4 h-4 text-muted-foreground" />
+                                        </Button>
+                                    </RenameDialog>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <Trash2 className="w-4 h-4 text-destructive" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete the document "{content.source_file}" and all of its associated questions.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => onDocumentDelete(content.id)} className={buttonVariants({ variant: "destructive" })}>
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
                             </div>
                         ))}
                     </div>
