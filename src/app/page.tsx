@@ -4,7 +4,9 @@ import { Toaster } from "@/components/ui/toaster";
 export default function Home() {
   return (
     <>
-      <AptitudeAceClient />
+      <main>
+        <AptitudeAceClient />
+      </main>
       <Toaster />
     </>
   );

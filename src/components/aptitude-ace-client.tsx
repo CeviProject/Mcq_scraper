@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard } from 'lucide-react';
+import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings } from 'lucide-react';
 import { SegregatedContent, Question } from '@/lib/types';
 import { segregateContentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import DashboardTab from './dashboard-tab';
 import TheoryZoneTab from './theory-zone-tab';
 import QuestionBankTab from './question-bank-tab';
@@ -46,8 +47,7 @@ export default function AptitudeAceClient() {
                   options: q.options,
                   topic: q.topic || 'Uncategorized',
                   difficulty: 'Not Set',
-                  isUnique: false,
-                  solution: 'No solution added yet.',
+                  solution: '',
                   chatHistory: [],
                   sourceFile: file.name,
                 }));
@@ -106,16 +106,20 @@ export default function AptitudeAceClient() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background font-body">
-      <header className="sticky top-0 z-10 w-full border-b bg-card shadow-sm">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
+    <div className="flex min-h-screen w-full flex-col">
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
           <div className="flex items-center gap-3">
             <BrainCircuit className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground font-headline">Aptitude Ace</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Aptitude Ace</h1>
           </div>
-        </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="icon">
+              <Settings className="h-4 w-4" />
+              <span className="sr-only">Settings</span>
+            </Button>
+          </div>
       </header>
-      <main className="container mx-auto p-4 md:p-6">
+      <div className="container mx-auto p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="dashboard" className="w-full">
           <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
             <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</TabsTrigger>
@@ -137,7 +141,7 @@ export default function AptitudeAceClient() {
             <TestGeneratorTab questions={allQuestions} />
           </TabsContent>
         </Tabs>
-      </main>
+      </div>
     </div>
   );
 }

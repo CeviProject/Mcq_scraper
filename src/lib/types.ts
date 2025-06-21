@@ -9,7 +9,6 @@ export type Question = {
   options?: string[];
   topic: string;
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Not Set';
-  isUnique: boolean;
   solution: string;
   chatHistory?: ChatMessage[];
   sourceFile: string;

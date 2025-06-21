@@ -1,17 +1,15 @@
 'use client'
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Question, SegregatedContent } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ListChecks, Sparkles, File, BookCopy, Wand2, Loader2, BrainCircuit, Check, X } from 'lucide-react';
+import { ListChecks, Sparkles, File, HelpCircle, Wand2, Loader2, BrainCircuit, Check, X, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getSolutionAction, getTricksAction, askFollowUpAction } from '@/app/actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn, normalizeOption } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface QuestionBankTabProps {
   questions: Question[];
@@ -30,36 +29,56 @@ interface QuestionBankTabProps {
 const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard', 'Not Set'];
 
 function QuestionItem({ question, onQuestionUpdate, theory }: { question: Question, onQuestionUpdate: (question: Question) => void, theory?: string }) {
-  const [topic, setTopic] = useState(question.topic);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  
   const [isSolutionDialogOpen, setIsSolutionDialogOpen] = useState(false);
-  const [isGeneratingSolution, setIsGeneratingSolution] = useState(false);
   const [followUpQuery, setFollowUpQuery] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [aiTricks, setAiTricks] = useState<string | null>(null);
   const [isGeneratingTricks, setIsGeneratingTricks] = useState(false);
   const { toast } = useToast();
 
-  const hasGeneratedSolution = question.solution && question.solution !== 'No solution added yet.';
-
-  const handleGenerateSolution = async () => {
-    setIsGeneratingSolution(true);
-    const result = await getSolutionAction({ 
-      questionText: question.text,
-      options: question.options,
-      theoryContext: theory 
-    });
-    if ('error' in result) {
-      toast({ variant: 'destructive', title: 'Error', description: result.error });
-    } else {
-      onQuestionUpdate({ 
-        ...question, 
-        solution: result.solution, 
-        correctOption: result.correctOption,
-        difficulty: question.difficulty === 'Not Set' ? result.difficulty : question.difficulty,
-        chatHistory: [] 
-      });
+  useEffect(() => {
+    // If a correct option is already present, the question is considered "verified" from the start.
+    if (question.correctOption) {
+      setIsVerified(true);
     }
-    setIsGeneratingSolution(false);
+  }, [question.correctOption]);
+
+  const handleVerifyAnswer = async () => {
+    if (!question.userSelectedOption) {
+      toast({ variant: 'destructive', title: 'Please select an option first.' });
+      return;
+    }
+    setIsVerifying(true);
+    
+    // If we don't have the solution data, fetch it in one API call.
+    if (!question.solution) {
+      const result = await getSolutionAction({ 
+        questionText: question.text,
+        options: question.options,
+        theoryContext: theory 
+      });
+
+      if ('error' in result) {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
+        setIsVerifying(false);
+        return;
+      } else {
+        // Update the question in the parent state with all new data.
+        onQuestionUpdate({ 
+          ...question, 
+          solution: result.solution, 
+          correctOption: result.correctOption,
+          difficulty: question.difficulty === 'Not Set' ? result.difficulty : question.difficulty,
+          chatHistory: [] 
+        });
+      }
+    }
+
+    setIsVerified(true);
+    setIsVerifying(false);
   };
 
   const handleAskFollowUp = async () => {
@@ -106,11 +125,9 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
   const handleSelectOption = (option: string) => {
     onQuestionUpdate({ ...question, userSelectedOption: option });
   };
-
-  const answerVerified = question.correctOption && question.userSelectedOption;
-
+  
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardContent className="p-6">
         <p className="text-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
         {question.options && question.options.length > 0 && (
@@ -118,7 +135,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
             className="mb-4 space-y-2" 
             value={question.userSelectedOption} 
             onValueChange={handleSelectOption}
-            disabled={!!answerVerified}
+            disabled={isVerified}
           >
             {question.options.map((option, index) => {
               const isCorrect = normalizeOption(question.correctOption || '') === normalizeOption(option);
@@ -130,14 +147,14 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
                   <Label 
                     htmlFor={`${question.id}-option-${index}`}
                     className={cn(
-                      "cursor-pointer",
-                      answerVerified && isCorrect && "text-green-700 font-bold",
-                      answerVerified && isSelected && !isCorrect && "text-red-700 font-bold line-through"
+                      "cursor-pointer flex items-center gap-2",
+                      isVerified && isCorrect && "text-green-500 font-bold",
+                      isVerified && isSelected && !isCorrect && "text-red-500 font-bold"
                     )}
                   >
                     {option}
-                    {answerVerified && isCorrect && <Check className="inline w-4 h-4 ml-2 text-green-700" />}
-                    {answerVerified && isSelected && !isCorrect && <X className="inline w-4 h-4 ml-2 text-red-700" />}
+                    {isVerified && isCorrect && <CheckCircle className="inline w-4 h-4" />}
+                    {isVerified && isSelected && !isCorrect && <XCircle className="inline w-4 h-4" />}
                   </Label>
                 </div>
               );
@@ -147,129 +164,104 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
         <div className="flex flex-wrap gap-2 mb-4">
           <Badge variant="secondary"><File className="w-3 h-3 mr-1"/>{question.sourceFile}</Badge>
           <Badge variant="outline">Topic: {question.topic}</Badge>
-          <Badge variant={question.isUnique ? "default" : "outline"}><Sparkles className="w-3 h-3 mr-1"/>{question.isUnique ? 'Unique' : 'Common'}</Badge>
           <Badge variant="outline">{question.difficulty}</Badge>
         </div>
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row gap-4 bg-muted/50 p-4 rounded-b-lg">
-        <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor={`topic-${question.id}`}>Topic</Label>
-            <Input id={`topic-${question.id}`} value={topic} onChange={(e) => setTopic(e.target.value)} onBlur={() => onQuestionUpdate({...question, topic})} placeholder="e.g., Percentages" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`difficulty-${question.id}`}>Difficulty</Label>
+      <CardFooter className="flex flex-col sm:flex-row gap-4 items-center bg-muted/50 p-4 rounded-b-lg">
+        <div className="flex-1 w-full flex items-center gap-4">
             <Select value={question.difficulty} onValueChange={(value) => onQuestionUpdate({...question, difficulty: value as Question['difficulty']})}>
-              <SelectTrigger id={`difficulty-${question.id}`}>
+              <SelectTrigger id={`difficulty-${question.id}`} className="w-[120px]">
                 <SelectValue placeholder="Set difficulty" />
               </SelectTrigger>
               <SelectContent>
                 {difficultyOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
+            <Input value={question.topic} onChange={(e) => onQuestionUpdate({...question, topic: e.target.value})} placeholder="e.g., Percentages" />
         </div>
-        <div className="flex items-end gap-2 w-full sm:w-auto">
-            <div className="flex items-center space-x-2">
-              <Switch id={`unique-${question.id}`} checked={question.isUnique} onCheckedChange={(checked) => onQuestionUpdate({...question, isUnique: checked})} />
-              <Label htmlFor={`unique-${question.id}`}>Unique</Label>
-            </div>
-            <Dialog open={isSolutionDialogOpen} onOpenChange={setIsSolutionDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline"><BookCopy className="w-4 h-4 mr-2"/>Solution</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[800px]">
-                <DialogHeader>
-                  <DialogTitle>Solution & Chat</DialogTitle>
-                  <DialogDescription>Review the solution and ask follow-up questions.</DialogDescription>
-                </DialogHeader>
-                <ScrollArea className="max-h-[70vh] -mx-6 px-6">
-                    <div className="py-4 pr-6 space-y-6">
-                        <div>
-                            <h4 className="font-semibold mb-2">Question:</h4>
-                            <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
-                             {question.options && question.options.length > 0 && (
-                                <div className="mt-2 space-y-1">
-                                    {question.options.map((opt, i) => <p key={i} className="text-sm text-muted-foreground">{opt}</p>)}
-                                </div>
-                            )}
-                        </div>
-                        <Separator />
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-semibold">Solution</h4>
-                                {!hasGeneratedSolution && (
-                                    <Button onClick={handleGenerateSolution} size="sm" disabled={isGeneratingSolution}>
-                                        {isGeneratingSolution ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                                        Generate Solution
-                                    </Button>
-                                )}
-                            </div>
-                            {isGeneratingSolution ? (
-                                <div className="flex items-center space-x-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /><span>Generating...</span></div>
-                            ) : hasGeneratedSolution ? (
-                                <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{question.solution}</ReactMarkdown>
-                            ) : (
-                                  <p className="text-sm text-muted-foreground">Click the button to generate an AI-powered solution.</p>
-                            )}
-                        </div>
-                        
-                        {hasGeneratedSolution && (
-                            <>
-                                <Separator />
-                                <div className="space-y-4">
-                                    <h4 className="font-semibold">Ask a Follow-up</h4>
-                                    <div className="space-y-4">
-                                        {question.chatHistory?.map((msg, index) => (
-                                            <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                                                {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>}
-                                                <div className={`rounded-lg p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                                    <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {isReplying && (
-                                            <div className="flex items-start gap-3">
-                                               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>
-                                               <div className="rounded-lg p-3 text-sm bg-muted flex items-center space-x-2">
-                                                   <Loader2 className="animate-spin h-4 w-4" /> <span>Thinking...</span>
-                                               </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex items-start gap-2 pt-4">
-                                        <Textarea 
-                                            placeholder="Ask a question about the solution..." 
-                                            value={followUpQuery}
-                                            onChange={(e) => setFollowUpQuery(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    handleAskFollowUp();
-                                                }
-                                            }}
-                                            disabled={isReplying}
-                                            rows={1}
-                                            className="min-h-0 resize-none"
-                                        />
-                                        <Button onClick={handleAskFollowUp} disabled={isReplying || !followUpQuery.trim()}>Send</Button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </ScrollArea>
-                <DialogFooter className="pt-4 border-t">
-                  <DialogClose asChild>
-                    <Button type="button" variant="secondary">Close</Button>
-                  </DialogClose>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+        <div className="flex items-end gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+            {!isVerified ? (
+              <Button onClick={handleVerifyAnswer} disabled={isVerifying || !question.userSelectedOption} className="w-full sm:w-auto">
+                {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Verify Answer
+              </Button>
+            ) : (
+              <Dialog open={isSolutionDialogOpen} onOpenChange={setIsSolutionDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full sm:w-auto"><HelpCircle className="w-4 h-4 mr-2"/>Solution & Chat</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[800px]">
+                  <DialogHeader>
+                    <DialogTitle>Solution & Chat</DialogTitle>
+                    <DialogDescription>Review the solution and ask follow-up questions.</DialogDescription>
+                  </DialogHeader>
+                  <ScrollArea className="max-h-[70vh] -mx-6 px-6">
+                      <div className="py-4 pr-6 space-y-6">
+                          <div>
+                              <h4 className="font-semibold mb-2">Question:</h4>
+                              <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
+                          </div>
+                          <Separator />
+                          <div>
+                              <div className="flex justify-between items-center mb-2">
+                                  <h4 className="font-semibold">Solution</h4>
+                              </div>
+                               <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{question.solution}</ReactMarkdown>
+                          </div>
+                          
+                          <Separator />
+                          <div className="space-y-4">
+                              <h4 className="font-semibold">Ask a Follow-up</h4>
+                              <div className="space-y-4">
+                                  {question.chatHistory?.map((msg, index) => (
+                                      <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                                          {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>}
+                                          <div className={`rounded-lg p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                              <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                                          </div>
+                                      </div>
+                                  ))}
+                                  {isReplying && (
+                                      <div className="flex items-start gap-3">
+                                         <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>
+                                         <div className="rounded-lg p-3 text-sm bg-muted flex items-center space-x-2">
+                                             <Loader2 className="animate-spin h-4 w-4" /> <span>Thinking...</span>
+                                         </div>
+                                      </div>
+                                  )}
+                              </div>
+                              <div className="flex items-start gap-2 pt-4">
+                                  <Textarea 
+                                      placeholder="Ask a question about the solution..." 
+                                      value={followUpQuery}
+                                      onChange={(e) => setFollowUpQuery(e.target.value)}
+                                      onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && !e.shiftKey) {
+                                              e.preventDefault();
+                                              handleAskFollowUp();
+                                          }
+                                      }}
+                                      disabled={isReplying}
+                                      rows={1}
+                                      className="min-h-0 resize-none"
+                                  />
+                                  <Button onClick={handleAskFollowUp} disabled={isReplying || !followUpQuery.trim()}>Send</Button>
+                              </div>
+                          </div>
+                      </div>
+                  </ScrollArea>
+                  <DialogFooter className="pt-4 border-t">
+                    <DialogClose asChild>
+                      <Button type="button" variant="secondary">Close</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
 
             <Dialog onOpenChange={(open) => { if (!open) setAiTricks(null) }}>
               <DialogTrigger asChild>
-                <Button variant="outline"><Sparkles className="w-4 h-4 mr-2" />Tricks</Button>
+                <Button variant="outline" className="w-full sm:w-auto"><Sparkles className="w-4 h-4 mr-2" />Tricks</Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[800px]">
                 <DialogHeader>
@@ -299,27 +291,26 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
   )
 }
 
-export default function QuestionBankTab({ questions, onQuestionUpdate, segregatedContents }: QuestionBankTabProps) {
-  const [topicFilter, setTopicFilter] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState('All');
-  const [uniquenessFilter, setUniquenessFilter] = useState<'All' | 'Unique' | 'Common'>('All');
-  const [sourceFileFilter, setSourceFileFilter] = useState('All');
 
-  const sourceFiles = useMemo(() => ['All', ...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
+export default function QuestionBankTab({ questions, onQuestionUpdate, segregatedContents }: QuestionBankTabProps) {
+  const [topicFilter, setTopicFilter] = useState('All');
+  const [difficultyFilter, setDifficultyFilter] = useState('All');
+  const [sourceFileFilter, setSourceFileFilter] = useState<string[]>([]);
+
+  const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
   const availableTopics = useMemo(() => ['All', ...Array.from(new Set(questions.map(q => q.topic).filter(t => t && t !== 'Uncategorized')))], [questions]);
 
   const filteredQuestions = useMemo(() => {
     const filtered = questions.filter(q => {
-      const topicMatch = topicFilter && topicFilter !== 'All' ? q.topic === topicFilter : true;
+      const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
-      const uniquenessMatch = uniquenessFilter !== 'All' ? (uniquenessFilter === 'Unique' ? q.isUnique : !q.isUnique) : true;
-      const sourceFileMatch = sourceFileFilter !== 'All' ? q.sourceFile === sourceFileFilter : true;
-      return topicMatch && difficultyMatch && uniquenessMatch && sourceFileMatch;
+      const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile);
+      return topicMatch && difficultyMatch && sourceFileMatch;
     });
 
     return filtered.sort((a, b) => a.topic.localeCompare(b.topic));
 
-  }, [questions, topicFilter, difficultyFilter, uniquenessFilter, sourceFileFilter]);
+  }, [questions, topicFilter, difficultyFilter, sourceFileFilter]);
 
   if (questions.length === 0) {
     return (
@@ -342,7 +333,7 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
           <CardTitle>Filter Questions</CardTitle>
           <CardDescription>Refine the question list to focus your practice.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="topic-filter">Topic</Label>
              <Select value={topicFilter} onValueChange={setTopicFilter}>
@@ -363,26 +354,33 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="uniqueness-filter">Uniqueness</Label>
-            <Select value={uniquenessFilter} onValueChange={v => setUniquenessFilter(v as any)}>
-              <SelectTrigger id="uniqueness-filter"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                <SelectItem value="Unique">Unique</SelectItem>
-                <SelectItem value="Common">Common</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
            <div className="space-y-2">
             <Label htmlFor="source-filter">Source PDF</Label>
-            <Select value={sourceFileFilter} onValueChange={setSourceFileFilter}>
-              <SelectTrigger id="source-filter"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Sources</SelectItem>
-                {sourceFiles.slice(1).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full justify-between">
+                  {sourceFileFilter.length === 0 ? 'All Sources' : sourceFileFilter.length === 1 ? sourceFileFilter[0] : `${sourceFileFilter.length} sources selected`}
+                  <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                <DropdownMenuLabel>Filter by Source File</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {sourceFiles.map(file => (
+                    <DropdownMenuCheckboxItem
+                        key={file}
+                        checked={sourceFileFilter.includes(file)}
+                        onCheckedChange={checked => {
+                            setSourceFileFilter(prev => 
+                                checked ? [...prev, file] : prev.filter(f => f !== file)
+                            )
+                        }}
+                    >
+                        {file}
+                    </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardContent>
       </Card>
