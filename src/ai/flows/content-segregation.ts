@@ -66,7 +66,15 @@ The PDF content is provided below:
 
 Your goal is to be exhaustive. **Assume everything in the document is either theory or a question.**
 
-1.  **Extract Theory**: Identify and extract ALL content that is not a direct question or its options. This includes introduction paragraphs, topic explanations, formulas, definitions, examples, worked-out solutions within the theory section, and any other explanatory text. Preserve the original formatting as much as possible, including paragraphs, lists, and tables. Return this content as a single, comprehensive string formatted with Markdown. When including mathematical formulas, use LaTeX syntax wrapped in '$' for inline math and '$$' for block math. Be thorough and ensure no theoretical content is missed.
+1.  **Extract and Format Theory**:
+    *   Identify and extract ALL content that is not a direct question or its options. This includes introduction paragraphs, topic explanations, formulas, definitions, examples, and any other explanatory text.
+    *   **Crucially, format this content for readability using Markdown.** Your goal is to make it look like a well-structured study guide.
+    *   Use Markdown headings ('#', '##', '###') for titles and sub-topics.
+    *   Use bullet points ('*' or '-') for lists.
+    *   Use bold ('**text**') and italics ('*text*') to emphasize key terms and concepts.
+    *   Preserve paragraph breaks. **Ensure there are blank lines between paragraphs.**
+    *   For mathematical formulas or equations, use LaTeX syntax. Wrap inline math in single dollar signs (e.g., $ax^2 + bx + c = 0$) and block-level math in double dollar signs (e.g., $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$).
+    *   Return this well-structured content as a single Markdown string. Be thorough and ensure no theoretical content is missed.
 
 2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. For each question:
     - Extract the full question text. Do not include the question number (e.g., "1.", "Q2.").
