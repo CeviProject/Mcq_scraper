@@ -97,6 +97,71 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
   }
 }
 
+export async function deleteDocumentAction({ documentId }: { documentId: string }): Promise<{ success: true } | { error: string }> {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value
+                },
+            },
+        }
+    );
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error("Authentication error: You must be logged in to delete documents.");
+        }
+
+        // First, verify the user owns the document
+        const { data: doc, error: docError } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('id', documentId)
+            .eq('user_id', user.id)
+            .single();
+
+        if (docError || !doc) {
+            throw new Error("Document not found or you don't have permission to delete it.");
+        }
+        
+        // Note: For full robustness, the database should have ON DELETE CASCADE 
+        // constraints on foreign keys pointing to the documents table.
+        // We will proceed by deleting questions first. This will fail if test_attempts
+        // refer to them and there's no cascade delete set up.
+        
+        // Delete associated questions first
+        const { error: questionsError } = await supabase
+            .from('questions')
+            .delete()
+            .eq('document_id', documentId);
+        
+        if (questionsError) {
+            throw new Error(`Failed to delete associated questions: ${questionsError.message}`);
+        }
+
+        // Then, delete the document itself
+        const { error: documentError } = await supabase
+            .from('documents')
+            .delete()
+            .eq('id', documentId);
+
+        if (documentError) {
+            throw new Error(`Failed to delete document: ${documentError.message}`);
+        }
+
+        return { success: true };
+
+    } catch (error: any) {
+        console.error('Error during document deletion:', error);
+        return { error: error.message || 'Failed to delete document. Please try again.' };
+    }
+}
+
 export async function getSolutionAction(input: Omit<GetSolutionInput, 'apiKey'>): Promise<GetSolutionOutput | { error: string }> {
     try {
         const apiKey = await getApiKey();

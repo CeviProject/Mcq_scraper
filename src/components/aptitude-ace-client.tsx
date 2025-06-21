@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2 } from 'lucide-react';
 import { Document, Question, TestResult, ChatMessage, Test, Profile } from '@/lib/types';
-import { segregateContentAction } from '@/app/actions';
+import { segregateContentAction, deleteDocumentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -194,6 +194,24 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     setProcessingProgress(null);
   }, [session, toast, documents]);
 
+  const handleDocumentDelete = useCallback(async (documentId: string) => {
+    if (!session) {
+        toast({ variant: "destructive", title: "You must be logged in to delete files." });
+        return;
+    }
+
+    const result = await deleteDocumentAction({ documentId });
+
+    if ('error' in result) {
+        toast({ variant: "destructive", title: "Error deleting document", description: result.error });
+    } else {
+        setDocuments(prev => prev.filter(d => d.id !== documentId));
+        setQuestions(prev => prev.filter(q => q.document_id !== documentId));
+        toast({ title: 'Document Deleted', description: 'The document and its questions have been removed.' });
+    }
+  }, [session, toast]);
+
+
   const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
     const { id, ...updateData } = updatedQuestion;
     const { error } = await supabase.from('questions').update(updateData).eq('id', id);
@@ -268,7 +286,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
             />
           </TabsContent>
           <TabsContent value="theory" className="mt-6">
-            <TheoryZoneTab documents={documents} />
+            <TheoryZoneTab documents={documents} onDocumentDelete={handleDocumentDelete} />
           </TabsContent>
           <TabsContent value="questions" className="mt-6">
             <QuestionBankTab 

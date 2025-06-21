@@ -4,22 +4,44 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Document } from '@/lib/types';
-import { BookOpen, FileText } from 'lucide-react';
+import { BookOpen, FileText, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface TheoryZoneTabProps {
   documents: Document[];
+  onDocumentDelete: (documentId: string) => void;
 }
 
-export default function TheoryZoneTab({ documents }: TheoryZoneTabProps) {
+export default function TheoryZoneTab({ documents, onDocumentDelete }: TheoryZoneTabProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(documents.length > 0 ? documents[0].source_file : null);
 
   const selectedContent = documents.find(c => c.source_file === selectedFile);
+  
+  // When a document is deleted, if it was the selected one, select the first available one.
+  React.useEffect(() => {
+    if (documents.length > 0 && !documents.some(d => d.source_file === selectedFile)) {
+      setSelectedFile(documents[0].source_file);
+    } else if (documents.length === 0) {
+      setSelectedFile(null);
+    }
+  }, [documents, selectedFile]);
+
 
   if (documents.length === 0) {
     return (
@@ -47,18 +69,40 @@ export default function TheoryZoneTab({ documents }: TheoryZoneTabProps) {
                     <h4 className="font-semibold text-sm p-2">Source Files</h4>
                     <div className="flex flex-col gap-1">
                         {documents.map((content) => (
-                            <Button 
-                                key={content.id}
-                                variant="ghost"
-                                className={cn(
-                                    "w-full justify-start text-left h-auto p-2", 
-                                    selectedFile === content.source_file && "bg-muted font-semibold"
-                                )}
-                                onClick={() => setSelectedFile(content.source_file)}
-                            >
-                                <FileText className="w-4 h-4 mr-2 shrink-0" />
-                                <span className="truncate">{content.source_file}</span>
-                            </Button>
+                           <div key={content.id} className="flex items-center group">
+                                <Button 
+                                    variant="ghost"
+                                    className={cn(
+                                        "w-full justify-start text-left h-auto p-2 flex-grow", 
+                                        selectedFile === content.source_file && "bg-muted font-semibold"
+                                    )}
+                                    onClick={() => setSelectedFile(content.source_file)}
+                                >
+                                    <FileText className="w-4 h-4 mr-2 shrink-0" />
+                                    <span className="truncate">{content.source_file}</span>
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Trash2 className="w-4 h-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the document "{content.source_file}" and all of its associated questions.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => onDocumentDelete(content.id)} className={buttonVariants({ variant: "destructive" })}>
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
                         ))}
                     </div>
                 </div>
