@@ -7,13 +7,11 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
-  console.log('[Auth Callback] Received request:', request.url);
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
-    console.log('[Auth Callback] Auth code found:', code);
     const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,13 +40,10 @@ export async function GET(request: NextRequest) {
     )
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      console.log('[Auth Callback] Successfully exchanged code for session. Redirecting to:', `${origin}${next}`);
       return NextResponse.redirect(`${origin}${next}`)
     }
-    console.error('[Auth Callback] Error exchanging code for session:', error.message);
     return NextResponse.redirect(`${origin}/login?error=Could not authenticate user: ${error.message}`);
   }
 
-  console.log('[Auth Callback] No auth code found. Redirecting to login with error.');
   return NextResponse.redirect(`${origin}/login?error=Could not authenticate user: No code provided.`);
 }
