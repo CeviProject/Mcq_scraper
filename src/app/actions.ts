@@ -1,11 +1,12 @@
 'use server';
 
-import { contentSegregation, ContentSegregationInput, ContentSegregationOutput } from '@/ai/flows/content-segregation';
+import { contentSegregation, ContentSegregationInput } from '@/ai/flows/content-segregation';
 import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksInput, GetTricksOutput, askFollowUp, AskFollowUpInput, AskFollowUpOutput } from '@/ai/flows/question-helpers';
 import { generateTestFeedback, GenerateTestFeedbackInput, GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
 import { batchSolveQuestions, BatchSolveInput, BatchSolveOutput } from '@/ai/flows/batch-question-solver';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import type { Document, Question } from '@/lib/types';
 
 async function getApiKey(): Promise<string | undefined> {
     const cookieStore = cookies();
@@ -33,11 +34,63 @@ async function getApiKey(): Promise<string | undefined> {
 }
 
 
-export async function segregateContentAction(input: Omit<ContentSegregationInput, 'apiKey'>): Promise<ContentSegregationOutput | { error: string }> {
+export async function segregateContentAction(input: Omit<ContentSegregationInput, 'apiKey'> & { fileName: string }): Promise<{ document: Document, questions: Question[] } | { error: string }> {
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+          cookies: {
+              get(name: string) {
+                  return cookieStore.get(name)?.value
+              },
+          },
+      }
+  );
+
   try {
-    const apiKey = await getApiKey();
-    const result = await contentSegregation({ ...input, apiKey });
-    return result;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("Authentication error: You must be logged in to upload documents.");
+    }
+
+    const apiKey = await getApiKey(); 
+    
+    const segResult = await contentSegregation({ pdfDataUri: input.pdfDataUri, apiKey });
+    
+    // Save document to DB
+    const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .insert({ user_id: user.id, source_file: input.fileName, theory: segResult.theory })
+        .select()
+        .single();
+    
+    if (docError) {
+      throw new Error(`Failed to save document: ${docError.message}`);
+    }
+    
+    let newQuestionsData: Question[] = [];
+    const questionsToInsert = segResult.questions
+      .filter(q => q.questionText && q.questionText.length > 5)
+      .map(q => ({
+        document_id: docData.id,
+        user_id: user.id,
+        text: q.questionText,
+        options: q.options,
+        topic: q.topic || 'Uncategorized',
+      }));
+
+    if (questionsToInsert.length > 0) {
+        const { data: insertedQuestions, error: qError } = await supabase.from('questions').insert(questionsToInsert).select();
+        if (qError) {
+          await supabase.from('documents').delete().eq('id', docData.id);
+          throw new Error(`Failed to save questions: ${qError.message}`);
+        }
+        newQuestionsData = insertedQuestions as Question[];
+    }
+    
+    return { document: docData as Document, questions: newQuestionsData };
+
   } catch (error: any) {
     console.error('Error during content segregation:', error);
     return { error: error.message || 'Failed to process PDF. Please try again.' };

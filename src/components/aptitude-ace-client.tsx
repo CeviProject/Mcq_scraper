@@ -64,8 +64,8 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
           // @ts-ignore
           sourceFile: q.documents.source_file
         })) || [];
-        // @ts-ignore
-        setQuestions(questionsWithSourceFile);
+        
+        setQuestions(questionsWithSourceFile as Question[]);
         
         setTestHistory(testsRes.data || []);
       }
@@ -147,6 +147,16 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     let processedCount = 0;
 
     for (const file of files) {
+      if (documents.some(doc => doc.source_file === file.name)) {
+        toast({
+          title: 'File Skipped',
+          description: `"${file.name}" has already been uploaded.`
+        });
+        processedCount++;
+        setProcessingProgress([processedCount, files.length]);
+        continue;
+      }
+
       try {
         const pdfDataUri = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -155,42 +165,22 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
             reader.readAsDataURL(file);
         });
 
-        const segResult = await segregateContentAction({ pdfDataUri });
+        const result = await segregateContentAction({ pdfDataUri, fileName: file.name });
 
-        if ('error' in segResult) {
-          toast({ variant: "destructive", title: `Error processing ${file.name}`, description: segResult.error });
-          continue; // Skip to next file
+        if ('error' in result) {
+          toast({ variant: "destructive", title: `Error processing ${file.name}`, description: result.error });
+          continue;
         }
         
-        // Save document to DB
-        const { data: docData, error: docError } = await supabase
-            .from('documents')
-            .insert({ user_id: session.user.id, source_file: file.name, theory: segResult.theory })
-            .select('id, source_file, theory')
-            .single();
-        
-        if (docError) throw new Error(`Failed to save document: ${docError.message}`);
-        
-        // Save questions to DB
-        const questionsToInsert = segResult.questions
-          .filter(q => q.questionText && q.questionText.length > 5)
-          .map(q => ({
-            document_id: docData.id,
-            user_id: session.user.id,
-            text: q.questionText,
-            options: q.options,
-            topic: q.topic || 'Uncategorized',
-          }));
+        const { document: newDoc, questions: newQuestions } = result;
 
-        if (questionsToInsert.length > 0) {
-            const { data: newQuestionsData, error: qError } = await supabase.from('questions').insert(questionsToInsert).select();
-            if (qError) throw new Error(`Failed to save questions: ${qError.message}`);
-             // @ts-ignore
-            setQuestions(prev => [...newQuestionsData.map(q => ({...q, sourceFile: docData.source_file})), ...prev]);
-        }
-        
-        // @ts-ignore
-        setDocuments(prev => [{...docData, questions: []}, ...prev]);
+        const questionsWithSource = newQuestions.map(q => ({
+            ...q,
+            sourceFile: newDoc.source_file
+        }));
+
+        setQuestions(prev => [...questionsWithSource, ...prev]);
+        setDocuments(prev => [{...newDoc, questions: []}, ...prev]);
 
       } catch (error: any) {
         toast({ variant: "destructive", title: `Error processing ${file.name}`, description: error.message });
@@ -202,7 +192,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
 
     setIsProcessing(false);
     setProcessingProgress(null);
-  }, [session, toast]);
+  }, [session, toast, documents]);
 
   const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
     const { id, ...updateData } = updatedQuestion;
