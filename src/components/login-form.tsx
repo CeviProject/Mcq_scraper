@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -91,7 +92,6 @@ export default function LoginForm() {
                         }
                     }}
                     providers={['google', 'github']}
-                    redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/`}
                 />
             </CardContent>
         </Card>
