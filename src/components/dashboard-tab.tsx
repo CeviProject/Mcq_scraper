@@ -42,9 +42,8 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
         
         setTopicPerformance(formattedData);
     };
-    // This is a placeholder, in a real app you would create an RPC in Supabase
-    // to calculate this efficiently. For now, we just show a message.
-    // fetchPerformance();
+    
+    fetchPerformance();
   }, [testHistory, supabase]);
 
   const analyticsData = useMemo(() => {
