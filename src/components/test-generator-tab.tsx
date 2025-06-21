@@ -227,15 +227,16 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
   
   const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
   
-  const questionsWithSolutions = useMemo(() => {
+  const testableQuestions = useMemo(() => {
+    // A question is "testable" if it has options and a correct answer has been identified for it.
     return questions.filter(q => 
         q.options && q.options.length > 0 && 
-        q.solution && q.correctOption
+        q.correctOption // This implies a solution has been generated.
     );
   }, [questions]);
 
   const handleGenerateTest = () => {
-    const filtered = questionsWithSolutions.filter(q => {
+    const filtered = testableQuestions.filter(q => {
       const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
       const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile);
@@ -339,7 +340,7 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         <div className="space-y-2 col-span-full">
             <Label>Available Questions for Test</Label>
-            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{questionsWithSolutions.length}</span> questions are available. Tests are created from multiple-choice questions for which you have verified the answer in the Question Bank.</p>
+            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{testableQuestions.length}</span> questions are available. Tests are created from multiple-choice questions for which you have verified the answer in the Question Bank.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="test-topic">Topic</Label>
@@ -368,7 +369,7 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
             value={numQuestions}
             onChange={e => setNumQuestions(Math.max(1, parseInt(e.target.value, 10) || 1))}
             min="1"
-            max={questionsWithSolutions.length}
+            max={testableQuestions.length}
           />
         </div>
         <div className="space-y-2">
@@ -413,7 +414,7 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={handleGenerateTest} className="w-full" disabled={questionsWithSolutions.length === 0}>
+        <Button onClick={handleGenerateTest} className="w-full" disabled={testableQuestions.length === 0}>
           <Wand2 className="mr-2 h-4 w-4" /> Generate Test
         </Button>
       </CardFooter>
