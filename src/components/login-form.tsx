@@ -47,7 +47,7 @@ export default function LoginForm() {
                     <CardTitle>Welcome</CardTitle>
                     <CardDescription>Loading...</CardDescription>
                 </CardHeader>
-            </Card>>
+            </Card>
         )
     }
 
