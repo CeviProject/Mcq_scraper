@@ -227,7 +227,12 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
   
   const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
   
-  const questionsWithSolutions = useMemo(() => questions.filter(q => q.solution && q.solution !== 'No solution added yet.' && q.correctOption), [questions]);
+  const questionsWithSolutions = useMemo(() => {
+    return questions.filter(q => 
+        q.options && q.options.length > 0 && 
+        q.solution && q.correctOption
+    );
+  }, [questions]);
 
   const handleGenerateTest = () => {
     const filtered = questionsWithSolutions.filter(q => {
@@ -334,7 +339,7 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         <div className="space-y-2 col-span-full">
             <Label>Available Questions for Test</Label>
-            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{questionsWithSolutions.length}</span> questions are available. Tests can only include multiple-choice questions for which a solution has already been generated.</p>
+            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{questionsWithSolutions.length}</span> questions are available. Tests are created from multiple-choice questions for which you have verified the answer in the Question Bank.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="test-topic">Topic</Label>

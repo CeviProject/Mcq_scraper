@@ -12,17 +12,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { normalizeOption } from '@/lib/utils';
+import { Progress } from './ui/progress';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface DashboardTabProps {
   onUpload: (files: File[]) => void;
   isProcessing: boolean;
-  pdfCount: number;
+  processingProgress: [number, number] | null;
+  sourceFiles: string[];
   questionCount: number;
   testHistory: TestResult[];
 }
 
-export default function DashboardTab({ onUpload, isProcessing, pdfCount, questionCount, testHistory }: DashboardTabProps) {
+export default function DashboardTab({ onUpload, isProcessing, processingProgress, sourceFiles, questionCount, testHistory }: DashboardTabProps) {
   const [dragActive, setDragActive] = useState(false);
+
+  const pdfCount = sourceFiles.length;
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -106,7 +111,7 @@ export default function DashboardTab({ onUpload, isProcessing, pdfCount, questio
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
             <Card 
-                className={`transition-colors h-full ${dragActive ? "border-primary bg-primary/10" : ""}`}
+                className={`transition-colors h-full flex flex-col ${dragActive ? "border-primary bg-primary/10" : ""}`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
@@ -116,29 +121,33 @@ export default function DashboardTab({ onUpload, isProcessing, pdfCount, questio
                     <CardTitle>Upload Your PDFs</CardTitle>
                     <CardDescription>Drag and drop your aptitude test PDFs here or click to select files.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                <div className="flex items-center justify-center w-full">
-                    <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted transition-colors">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
-                        <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                        <p className="text-xs text-muted-foreground">PDF files only</p>
+                <CardContent className="space-y-4 flex-grow flex flex-col justify-center">
+                {isProcessing && processingProgress ? (
+                  <div className="space-y-3 text-center px-4">
+                    <Loader2 className="w-10 h-10 mb-3 text-muted-foreground animate-spin mx-auto" />
+                    <Progress value={(processingProgress[0] / processingProgress[1]) * 100} className="w-full" />
+                    <p className="text-sm text-muted-foreground">Processing file {processingProgress[0]} of {processingProgress[1]}...</p>
+                    <p className="text-xs text-muted-foreground">Please wait, this may take a moment.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-center w-full">
+                        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
+                            <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p className="text-xs text-muted-foreground">PDF files only</p>
+                        </div>
+                        <input id="dropzone-file" type="file" className="hidden" accept=".pdf" multiple onChange={handleChange} disabled={isProcessing} />
+                        </label>
                     </div>
-                    <input id="dropzone-file" type="file" className="hidden" accept=".pdf" multiple onChange={handleChange} disabled={isProcessing} />
-                    </label>
-                </div>
-                <div className="flex justify-center">
-                    <Button onClick={() => document.getElementById('dropzone-file')?.click()} disabled={isProcessing}>
-                    {isProcessing ? (
-                        <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                        </>
-                    ) : (
-                        'Select Files'
-                    )}
-                    </Button>
-                </div>
+                    <div className="flex justify-center">
+                        <Button onClick={() => document.getElementById('dropzone-file')?.click()} disabled={isProcessing}>
+                          Select Files
+                        </Button>
+                    </div>
+                  </>
+                )}
                 </CardContent>
             </Card>
         </div>
@@ -150,7 +159,21 @@ export default function DashboardTab({ onUpload, isProcessing, pdfCount, questio
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">{pdfCount}</div>
-                    <p className="text-xs text-muted-foreground">Total documents processed</p>
+                    <p className="text-xs text-muted-foreground mb-1">Total documents processed</p>
+                    {pdfCount > 0 && (
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                              <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground -mt-1">View files</Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                              <DropdownMenuLabel>Uploaded Files</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {sourceFiles.map((file) => (
+                                  <DropdownMenuItem key={file} className="truncate">{file}</DropdownMenuItem>
+                              ))}
+                          </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                 </CardContent>
             </Card>
             <Card>

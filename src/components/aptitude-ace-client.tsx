@@ -15,6 +15,7 @@ import TestGeneratorTab from './test-generator-tab';
 export default function AptitudeAceClient() {
   const [segregatedContents, setSegregatedContents] = useState<SegregatedContent[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<[number, number] | null>(null);
   const [testHistory, setTestHistory] = useState<TestResult[]>([]);
   const { toast } = useToast();
 
@@ -28,11 +29,14 @@ export default function AptitudeAceClient() {
 
   const handleUpload = useCallback(async (files: File[]) => {
     setIsProcessing(true);
+    setProcessingProgress([0, files.length]);
+    const newContents: SegregatedContent[] = [];
+    let processedCount = 0;
+
     try {
-      const newContents: SegregatedContent[] = [];
-      await Promise.all(files.map(async (file) => {
+      for (const file of files) {
         const reader = new FileReader();
-        const promise = new Promise<void>((resolve, reject) => {
+        const promise = new Promise<SegregatedContent | null>((resolve, reject) => {
           reader.onload = async () => {
             try {
               const pdfDataUri = reader.result as string;
@@ -44,7 +48,8 @@ export default function AptitudeAceClient() {
                   title: `Error processing ${file.name}`,
                   description: result.error,
                 });
-                reject(new Error(result.error));
+                // Resolve with null to not break the loop for other files
+                resolve(null); 
                 return;
               }
               
@@ -61,12 +66,11 @@ export default function AptitudeAceClient() {
                   sourceFile: file.name,
                 }));
 
-              newContents.push({
+              resolve({
                 theory: result.theory,
                 questions: questions,
                 sourceFile: file.name,
               });
-              resolve();
             } catch (e) {
               reject(e);
             }
@@ -74,30 +78,42 @@ export default function AptitudeAceClient() {
           reader.onerror = (error) => reject(error);
           reader.readAsDataURL(file);
         });
-        await promise;
-      }));
+
+        const content = await promise;
+        if (content) {
+            newContents.push(content);
+        }
+        processedCount++;
+        setProcessingProgress([processedCount, files.length]);
+      }
 
       setSegregatedContents(prev => [...prev, ...newContents]);
-      toast({
-        title: "Processing Complete",
-        description: `${files.length} PDF(s) processed and added successfully.`,
-      });
+      
+      if (newContents.length > 0) {
+        toast({
+            title: "Processing Complete",
+            description: `${newContents.length} of ${files.length} PDF(s) processed and added.`,
+        });
+      }
 
     } catch (error) {
       console.error(error);
       toast({
         variant: "destructive",
-        title: "An error occurred",
+        title: "An unexpected error occurred",
         description: "Something went wrong during PDF processing.",
       });
     } finally {
       setIsProcessing(false);
+      setProcessingProgress(null);
     }
   }, [toast]);
 
   const allQuestions = useMemo(() => {
     return segregatedContents.flatMap(content => content.questions);
   }, [segregatedContents]);
+
+  const sourceFiles = useMemo(() => segregatedContents.map(c => c.sourceFile), [segregatedContents]);
 
   const handleQuestionUpdate = useCallback((updatedQuestion: Question) => {
     setSegregatedContents(prevContents => {
@@ -140,8 +156,9 @@ export default function AptitudeAceClient() {
           <TabsContent value="dashboard" className="mt-6">
             <DashboardTab 
               onUpload={handleUpload} 
-              isProcessing={isProcessing} 
-              pdfCount={segregatedContents.length} 
+              isProcessing={isProcessing}
+              processingProgress={processingProgress}
+              sourceFiles={sourceFiles}
               questionCount={allQuestions.length} 
               testHistory={testHistory}
             />
