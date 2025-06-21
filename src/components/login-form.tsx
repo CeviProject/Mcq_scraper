@@ -21,6 +21,7 @@ try {
 }
 
 export default function LoginForm() {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
     if (configError) {
         return (
@@ -51,7 +52,7 @@ export default function LoginForm() {
                     <CardTitle>Welcome</CardTitle>
                     <CardDescription>Loading...</CardDescription>
                 </CardHeader>
-            </Card>
+             </Card>
         )
     }
 
@@ -64,6 +65,7 @@ export default function LoginForm() {
             <CardContent>
                 <Auth
                     supabaseClient={supabase}
+                    redirectTo={`${baseUrl}/auth/callback`}
                     appearance={{
                         theme: ThemeSupa,
                         variables: {
