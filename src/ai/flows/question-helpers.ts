@@ -47,7 +47,7 @@ const getSolutionFlow = ai.defineFlow(
 
         const solutionPrompt = dynamicAi.definePrompt({
             name: 'getSolutionPrompt_dynamic',
-            model: 'googleai/gemini-1.5-pro-latest',
+            model: 'googleai/gemini-1.5-flash-latest',
             input: {schema: GetSolutionInputSchema},
             output: {schema: GetSolutionOutputSchema},
             prompt: `You are an expert aptitude test tutor. A student needs help with a question.
@@ -129,7 +129,7 @@ const askFollowUpFlow = ai.defineFlow(
 
         const followUpPrompt = dynamicAi.definePrompt({
           name: 'askFollowUpPrompt_dynamic',
-          model: 'googleai/gemini-1.5-pro-latest',
+          model: 'googleai/gemini-1.5-flash-latest',
           input: { schema: AskFollowUpInputSchema },
           output: { schema: AskFollowUpOutputSchema },
           prompt: `You are an expert aptitude test tutor engaged in a conversation with a student.
@@ -196,7 +196,7 @@ const getTricksFlow = ai.defineFlow(
 
         const tricksPrompt = dynamicAi.definePrompt({
             name: 'getTricksPrompt_dynamic',
-            model: 'googleai/gemini-1.5-pro-latest',
+            model: 'googleai/gemini-1.5-flash-latest',
             input: {schema: GetTricksInputSchema},
             output: {schema: GetTricksOutputSchema},
             prompt: `You are an expert aptitude test coach. Your goal is to provide highly specific and actionable advice for solving a certain category of problem, based on a single sample question.

@@ -56,7 +56,7 @@ const batchSolveFlow = ai.defineFlow(
     
     const prompt = dynamicAi.definePrompt({
       name: 'batchSolvePrompt_dynamic',
-      model: 'googleai/gemini-1.5-pro-latest',
+      model: 'googleai/gemini-1.5-flash-latest',
       input: {schema: BatchSolveInputSchema},
       output: {schema: BatchSolveOutputSchema},
       prompt: `You are an expert aptitude test tutor. You will be given a JSON array of questions.
