@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import {z} from 'genkit';
 
 const QuestionToSolveSchema = z.object({
   id: z.string().describe("The unique identifier for the question."),
