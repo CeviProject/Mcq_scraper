@@ -12,11 +12,13 @@ export default async function Home() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  const googleApiKey = process.env.GOOGLE_API_KEY;
 
   const isSupabaseConfigured = supabaseUrl && !supabaseUrl.includes('YOUR_SUPABASE_URL_HERE') && supabaseAnonKey && !supabaseAnonKey.includes('YOUR_SUPABASE_ANON_KEY_HERE');
   const isBaseUrlConfigured = baseUrl && baseUrl.startsWith('http');
+  const isAiConfigured = googleApiKey && !googleApiKey.includes('YOUR_GEMINI_API_KEY_HERE');
 
-  if (!isSupabaseConfigured || !isBaseUrlConfigured) {
+  if (!isSupabaseConfigured || !isBaseUrlConfigured || !isAiConfigured) {
     return (
         <main className="flex h-screen w-full items-center justify-center p-6">
             <div className="w-full max-w-2xl">
@@ -34,6 +36,9 @@ export default async function Home() {
                           )}
                           {!isBaseUrlConfigured && (
                             <li><code>NEXT_PUBLIC_BASE_URL</code> (must be a valid URL, e.g., http://localhost:9002)</li>
+                          )}
+                          {!isAiConfigured && (
+                            <li><code>GOOGLE_API_KEY</code></li>
                           )}
                       </ul>
                   </AlertDescription>

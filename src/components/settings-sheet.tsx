@@ -79,6 +79,19 @@ export default function SettingsSheet({ open, onOpenChange, theme, setTheme, use
                         />
                     </div>
                     <div className="grid gap-3">
+                        <Label htmlFor="api-key">Gemini API Key</Label>
+                        <Input
+                            id="api-key"
+                            type="password"
+                            placeholder="Set in .env.local"
+                            readOnly
+                            className="col-span-2 h-8"
+                        />
+                        <p className="text-xs text-muted-foreground col-span-2">
+                            For security, your API key must be set in the <code>.env.local</code> file. This field is for display only. Restart the server after changing the key.
+                        </p>
+                    </div>
+                    <div className="grid gap-3">
                         <Label>Theme</Label>
                         <RadioGroup defaultValue={theme} onValueChange={(value) => setTheme(value as 'light' | 'dark')} className="flex items-center space-x-2">
                              <Label htmlFor="theme-light" className="flex items-center gap-2 border rounded-md p-2 px-3 cursor-pointer has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary">
