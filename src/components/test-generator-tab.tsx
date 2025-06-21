@@ -17,7 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '@/lib/utils';
+import { cn, normalizeOption } from '@/lib/utils';
 
 type TestStatus = 'configuring' | 'in-progress' | 'results';
 const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard'];
@@ -40,7 +40,7 @@ function TestResults({
     const performance: Record<string, { correct: number; total: number }> = {};
 
     test.forEach(q => {
-      const isCorrect = userAnswers[q.id] === q.correctOption;
+      const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
       if (isCorrect) score++;
 
       if (!performance[q.topic]) {
@@ -119,8 +119,8 @@ function TestResults({
                   <p className="font-semibold mb-2">{index + 1}. {q.text}</p>
                   <div className="space-y-2">
                       {q.options?.map((option, i) => {
-                          const isCorrect = q.correctOption === option;
-                          const isUserAnswer = userAnswers[q.id] === option;
+                          const isCorrect = normalizeOption(q.correctOption || '') === normalizeOption(option);
+                          const isUserAnswer = normalizeOption(userAnswers[q.id] || '') === normalizeOption(option);
                           return (
                               <div key={i} className={cn("flex items-center gap-3 p-2 rounded-md", isCorrect ? "bg-green-100 dark:bg-green-900/30" : isUserAnswer ? "bg-red-100 dark:bg-red-900/30" : "")}>
                                   {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : isUserAnswer ? <XCircle className="h-5 w-5 text-red-600" /> : <div className="h-5 w-5 shrink-0" />}
@@ -201,7 +201,7 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
           topic: q.topic,
           userAnswer: userAnswers[q.id] || "Not Answered",
           correctAnswer: q.correctOption,
-          isCorrect: userAnswers[q.id] === q.correctOption,
+          isCorrect: normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || ''),
       }));
 
       const feedbackResult = await generateTestFeedbackAction({ results: resultsForAI });

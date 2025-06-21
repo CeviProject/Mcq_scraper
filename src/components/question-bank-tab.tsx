@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '@/lib/utils';
+import { cn, normalizeOption } from '@/lib/utils';
 
 interface QuestionBankTabProps {
   questions: Question[];
@@ -121,7 +121,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
             disabled={!!answerVerified}
           >
             {question.options.map((option, index) => {
-              const isCorrect = question.correctOption === option;
+              const isCorrect = normalizeOption(question.correctOption || '') === normalizeOption(option);
               const isSelected = question.userSelectedOption === option;
               
               return (
