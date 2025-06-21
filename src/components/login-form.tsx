@@ -7,18 +7,19 @@ import { createClient } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+// Create client once outside the component.
+// This can throw if env vars are missing, so we'll handle it.
+let supabase: SupabaseClient | null = null;
+let configError: string | null = null;
+try {
+  supabase = createClient();
+} catch (e: any) {
+  configError = e.message;
+}
 
 export default function LoginForm() {
-    const [supabase, setSupabase] = React.useState<ReturnType<typeof createClient> | null>(null);
-    const [configError, setConfigError] = React.useState<string | null>(null);
-
-    React.useEffect(() => {
-        try {
-            setSupabase(createClient());
-        } catch (e: any) {
-            setConfigError(e.message);
-        }
-    }, []);
 
     if (configError) {
         return (
@@ -41,8 +42,10 @@ export default function LoginForm() {
     }
 
     if (!supabase) {
+        // This case should ideally not be reached if configError is handled,
+        // but it's a good fallback.
         return (
-            <Card>
+             <Card>
                 <CardHeader>
                     <CardTitle>Welcome</CardTitle>
                     <CardDescription>Loading...</CardDescription>
@@ -67,12 +70,28 @@ export default function LoginForm() {
                                 colors: {
                                     brand: 'hsl(var(--primary))',
                                     brandAccent: 'hsl(var(--primary) / 0.8)',
+                                    defaultButtonBackground: 'hsl(var(--card))',
+                                    defaultButtonBackgroundHover: 'hsl(var(--muted))',
+                                    anchorTextColor: 'hsl(var(--foreground))',
+                                    anchorTextHoverColor: 'hsl(var(--primary))',
+                                    inputBackground: 'hsl(var(--input))',
+                                    inputBorder: 'hsl(var(--border))',
+                                    inputBorderHover: 'hsl(var(--ring))',
+                                    inputBorderFocus: 'hsl(var(--ring))',
+                                    inputText: 'hsl(var(--foreground))',
+                                    messageText: 'hsl(var(--muted-foreground))',
+                                    dividerBackground: 'hsl(var(--border))',
+                                },
+                                radii: {
+                                    borderRadiusButton: 'var(--radius)',
+                                    buttonBorderRadius: 'var(--radius)',
+                                    inputBorderRadius: 'var(--radius)',
                                 }
                             }
                         }
                     }}
                     providers={['google', 'github']}
-                    redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002'}/`}
+                    redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/`}
                 />
             </CardContent>
         </Card>

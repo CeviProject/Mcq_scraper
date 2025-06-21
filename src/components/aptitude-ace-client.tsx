@@ -13,12 +13,14 @@ import TheoryZoneTab from './theory-zone-tab';
 import QuestionBankTab from './question-bank-tab';
 import TestGeneratorTab from './test-generator-tab';
 import SettingsSheet from './settings-sheet';
-import { Skeleton } from './ui/skeleton';
 import { createClient } from '@/lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
+
+// Create the Supabase client once at the module level
+// It's safe to assume config is valid here because page.tsx checks it.
+const supabase: SupabaseClient = createClient();
 
 export default function AptitudeAceClient({ session, profile }: { session: Session | null, profile: { username: string } | null }) {
-  const supabase = createClient();
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -28,12 +30,13 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState<[number, number] | null>(null);
   
-  // Transient UI state that doesn't belong in the database
   const [questionUiState, setQuestionUiState] = useState<Map<string, { userSelectedOption?: string; chatHistory?: ChatMessage[] }>>(new Map());
 
   const [username, setUsername] = useState('Guest');
   const [theme, setTheme] = useState('dark');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  const { toast } = useToast();
 
   // Initial data fetch and subscription setup
   useEffect(() => {
@@ -71,7 +74,7 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
 
     fetchData();
 
-  }, [session, supabase, toast]);
+  }, [session, toast]);
   
   useEffect(() => {
     // Theme logic from localStorage
@@ -95,7 +98,6 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
       localStorage.setItem('aptitude-ace-theme', newTheme);
   };
   
-  const { toast } = useToast();
 
   const handleTestComplete = useCallback(async (result: TestResult) => {
     if (!session) return;
@@ -140,7 +142,7 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
         title: "Test Saved",
         description: "Your test results have been saved to your dashboard.",
     });
-  }, [session, supabase, toast]);
+  }, [session, toast]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     if (!session) {
@@ -207,7 +209,7 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
 
     setIsProcessing(false);
     setProcessingProgress(null);
-  }, [session, supabase, toast]);
+  }, [session, toast]);
 
   const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
     const { id, ...updateData } = updatedQuestion;
@@ -218,7 +220,7 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
     } else {
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...updateData } : q));
     }
-  }, [supabase, toast]);
+  }, [toast]);
   
   const handleQuestionsUpdate = useCallback(async (updates: (Partial<Question> & { id: string })[]) => {
     const { error } = await supabase.from('questions').upsert(updates);
@@ -229,7 +231,7 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
         const updatesMap = new Map(updates.map(u => [u.id, u]));
         setQuestions(prev => prev.map(q => updatesMap.has(q.id) ? { ...q, ...updatesMap.get(q.id)! } : q));
     }
-  }, [supabase, toast]);
+  }, [toast]);
 
   const handleUsernameChange = (newName: string) => {
     setUsername(newName);
