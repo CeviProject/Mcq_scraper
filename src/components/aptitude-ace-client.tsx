@@ -39,10 +39,11 @@ export default function AptitudeAceClient() {
               }
               
               const questions = result.questions
-                .filter(q => q.length > 5)
-                .map((qText): Question => ({
+                .filter(q => q.questionText && q.questionText.length > 5)
+                .map((q): Question => ({
                   id: crypto.randomUUID(),
-                  text: qText,
+                  text: q.questionText,
+                  options: q.options,
                   topic: 'Uncategorized',
                   difficulty: 'Not Set',
                   isUnique: false,

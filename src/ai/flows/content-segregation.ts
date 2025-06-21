@@ -20,9 +20,15 @@ const ContentSegregationInputSchema = z.object({
 });
 export type ContentSegregationInput = z.infer<typeof ContentSegregationInputSchema>;
 
+const SegregatedQuestionSchema = z.object({
+  questionText: z.string().describe("The full, complete text of the question, without the question number."),
+  options: z.array(z.string()).optional().describe("An array of multiple-choice options for the question. For example, ['(A) 10', '(B) 20', '(C) 30', '(D) 40']. Extract the full option text including the letter/number."),
+});
+
+
 const ContentSegregationOutputSchema = z.object({
   theory: z.string().describe('The extracted theory content from the PDF. Preserve formatting and use Markdown for structure (headings, lists, etc.).'),
-  questions: z.array(z.string()).describe('An array of all extracted questions. Each question should be a single string in the array.'),
+  questions: z.array(SegregatedQuestionSchema).describe('An array of all extracted questions. Each question should be an object with its text and options.'),
 });
 export type ContentSegregationOutput = z.infer<typeof ContentSegregationOutputSchema>;
 
@@ -41,7 +47,10 @@ const prompt = ai.definePrompt({
 
   1.  **Extract Theory**: Identify and extract all theory, explanations, and concepts. Preserve the original formatting, including paragraphs, lists, and tables. Return this content as a single string formatted with Markdown.
 
-  2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. Each complete question (including all its parts if it's a multi-part question) should be a separate element in a JSON array of strings. Do not include the question numbers (e.g., "1.", "Q2.", etc.) in the extracted question text.
+  2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. For each question:
+      - Extract the full question text. Do not include the question number (e.g., "1.", "Q2.", etc.).
+      - If the question has multiple-choice options, extract them into an array of strings. Include the option label (e.g., "(A)", "1)") as part of the string.
+      - If there are no options, do not include the 'options' field.
 
   Return the extracted theory and the array of questions in the specified structured format.
   `,

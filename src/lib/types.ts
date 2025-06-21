@@ -1,6 +1,7 @@
 export type Question = {
   id: string;
   text: string;
+  options?: string[];
   topic: string;
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Not Set';
   isUnique: boolean;
