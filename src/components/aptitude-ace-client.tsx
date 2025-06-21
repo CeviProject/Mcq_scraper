@@ -46,9 +46,9 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
       setIsLoading(true);
       
       const [docsRes, questionsRes, testsRes] = await Promise.all([
-        supabase.from('documents').select('*').order('created_at', { ascending: false }),
-        supabase.from('questions').select('*, documents(source_file)').order('created_at', { ascending: false }),
-        supabase.from('tests').select('*').order('created_at', { ascending: false })
+        supabase.from('documents').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }),
+        supabase.from('questions').select('*, documents(source_file)').eq('user_id', session.user.id).order('created_at', { ascending: false }),
+        supabase.from('tests').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false })
       ]);
       
       if (docsRes.error || testsRes.error || questionsRes.error) {
