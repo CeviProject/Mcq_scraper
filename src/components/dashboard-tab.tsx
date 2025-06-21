@@ -49,11 +49,11 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
             topicData[topic] = { correct: 0, total: 0 };
           }
           topicData[topic].total++;
-          if (test.feedback) { // Only count if feedback (and thus correct answers) are available
-            const result = test.feedback.results.find(r => r.questionText === q.text);
-            if (result?.isCorrect) {
-              topicData[topic].correct++;
-            }
+
+          // Find the result for the current question from the test's results array
+          const result = test.results.find(r => r.questionText === q.text);
+          if (result?.isCorrect) {
+            topicData[topic].correct++;
           }
       });
     });
