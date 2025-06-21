@@ -1,3 +1,8 @@
+export type ChatMessage = {
+  role: 'user' | 'model';
+  content: string;
+};
+
 export type Question = {
   id: string;
   text: string;
@@ -6,6 +11,7 @@ export type Question = {
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Not Set';
   isUnique: boolean;
   solution: string;
+  chatHistory?: ChatMessage[];
   sourceFile: string;
 };
 

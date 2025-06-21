@@ -11,9 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ListChecks, Sparkles, File, BookCopy, Wand2, Loader2 } from 'lucide-react';
+import { ListChecks, Sparkles, File, BookCopy, Wand2, Loader2, BrainCircuit } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { getSolutionAction, getTricksAction } from '@/app/actions';
+import { getSolutionAction, getTricksAction, askFollowUpAction } from '@/app/actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -30,22 +30,59 @@ const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard', '
 
 function QuestionItem({ question, onQuestionUpdate, theory }: { question: Question, onQuestionUpdate: (question: Question) => void, theory?: string }) {
   const [topic, setTopic] = useState(question.topic);
-  const [solution, setSolution] = useState(question.solution);
-  const [aiSolution, setAiSolution] = useState<string | null>(null);
+  const [isSolutionDialogOpen, setIsSolutionDialogOpen] = useState(false);
   const [isGeneratingSolution, setIsGeneratingSolution] = useState(false);
+  const [followUpQuery, setFollowUpQuery] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
   const [aiTricks, setAiTricks] = useState<string | null>(null);
   const [isGeneratingTricks, setIsGeneratingTricks] = useState(false);
   const { toast } = useToast();
 
+  const hasGeneratedSolution = question.solution && question.solution !== 'No solution added yet.';
+
   const handleGenerateSolution = async () => {
     setIsGeneratingSolution(true);
-    const result = await getSolutionAction({ questionText: question.text, theoryContext: theory });
+    const result = await getSolutionAction({ 
+      questionText: question.text,
+      options: question.options,
+      theoryContext: theory 
+    });
     if ('error' in result) {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     } else {
-      setAiSolution(result.solution);
+      onQuestionUpdate({ ...question, solution: result.solution, chatHistory: [] });
     }
     setIsGeneratingSolution(false);
+  };
+
+  const handleAskFollowUp = async () => {
+    if (!followUpQuery.trim()) return;
+    setIsReplying(true);
+    const currentQuery = followUpQuery;
+    setFollowUpQuery('');
+
+    const currentHistory = question.chatHistory || [];
+    const newUserMessage = { role: 'user' as const, content: currentQuery };
+    
+    onQuestionUpdate({ ...question, chatHistory: [...currentHistory, newUserMessage] });
+
+    const result = await askFollowUpAction({
+        questionText: question.text,
+        options: question.options,
+        solution: question.solution,
+        theoryContext: theory,
+        chatHistory: currentHistory,
+        userQuery: currentQuery,
+    });
+    
+    if ('error' in result) {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
+        onQuestionUpdate({ ...question, chatHistory: currentHistory });
+    } else {
+        const aiMessage = { role: 'model' as const, content: result.answer };
+        onQuestionUpdate({ ...question, chatHistory: [...currentHistory, newUserMessage, aiMessage] });
+    }
+    setIsReplying(false);
   };
 
   const handleGenerateTricks = async () => {
@@ -102,43 +139,89 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
               <Switch id={`unique-${question.id}`} checked={question.isUnique} onCheckedChange={(checked) => onQuestionUpdate({...question, isUnique: checked})} />
               <Label htmlFor={`unique-${question.id}`}>Unique</Label>
             </div>
-            <Dialog onOpenChange={(open) => { if (!open) setAiSolution(null) }}>
+            <Dialog open={isSolutionDialogOpen} onOpenChange={setIsSolutionDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline"><BookCopy className="w-4 h-4 mr-2"/>Solution</Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[800px]">
                 <DialogHeader>
-                  <DialogTitle>Solution & Notes</DialogTitle>
-                  <DialogDescription>View user notes and generate an AI-powered solution.</DialogDescription>
+                  <DialogTitle>Solution & Chat</DialogTitle>
+                  <DialogDescription>Review the solution and ask follow-up questions.</DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[70vh] -mx-6 px-6">
-                    <div className="py-4 pr-6">
-                        <h4 className="font-semibold mb-2">Question:</h4>
-                        <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
-                        
-                        <Separator className="my-4" />
-
-                        <div className="space-y-4">
-                            <h4 className="font-semibold">AI Generated Solution</h4>
-                            {isGeneratingSolution && <div className="flex items-center space-x-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /><span>Generating...</span></div>}
-                            {aiSolution && <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{aiSolution}</ReactMarkdown>}
-                            {!aiSolution && !isGeneratingSolution && (
+                    <div className="py-4 pr-6 space-y-6">
+                        <div>
+                            <h4 className="font-semibold mb-2">Question:</h4>
+                            <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
+                             {question.options && question.options.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                    {question.options.map((opt, i) => <p key={i} className="text-sm text-muted-foreground">{opt}</p>)}
+                                </div>
+                            )}
+                        </div>
+                        <Separator />
+                        <div>
+                            <h4 className="font-semibold mb-2">Solution</h4>
+                            {isGeneratingSolution ? (
+                                <div className="flex items-center space-x-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /><span>Generating...</span></div>
+                            ) : hasGeneratedSolution ? (
+                                <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{question.solution}</ReactMarkdown>
+                            ) : (
                                 <div className="space-y-2">
-                                  <p className="text-sm text-muted-foreground">The AI will first attempt to use the theory from the source PDF. If that's not sufficient, it will use its general knowledge.</p>
-                                  <Button onClick={handleGenerateSolution}><Wand2 className="w-4 h-4 mr-2" />Generate AI Solution</Button>
+                                  <p className="text-sm text-muted-foreground">Click below to generate an AI-powered solution.</p>
+                                  <Button onClick={handleGenerateSolution}><Wand2 className="w-4 h-4 mr-2" />Generate Solution</Button>
                                 </div>
                             )}
                         </div>
                         
-                        <Separator className="my-4" />
-                        
-                        <Label htmlFor={`solution-${question.id}`} className="font-semibold">Your Solution/Notes</Label>
-                        <Textarea id={`solution-${question.id}`} value={solution} onChange={(e) => setSolution(e.target.value)} className="mt-2 min-h-[150px]" />
+                        {hasGeneratedSolution && (
+                            <>
+                                <Separator />
+                                <div className="space-y-4">
+                                    <h4 className="font-semibold">Ask a Follow-up</h4>
+                                    <div className="space-y-4">
+                                        {question.chatHistory?.map((msg, index) => (
+                                            <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                                                {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>}
+                                                <div className={`rounded-lg p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                                    <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {isReplying && (
+                                            <div className="flex items-start gap-3">
+                                               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>
+                                               <div className="rounded-lg p-3 text-sm bg-muted flex items-center space-x-2">
+                                                   <Loader2 className="animate-spin h-4 w-4" /> <span>Thinking...</span>
+                                               </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-start gap-2 pt-4">
+                                        <Textarea 
+                                            placeholder="Ask a question about the solution..." 
+                                            value={followUpQuery}
+                                            onChange={(e) => setFollowUpQuery(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleAskFollowUp();
+                                                }
+                                            }}
+                                            disabled={isReplying}
+                                            rows={1}
+                                            className="min-h-0 resize-none"
+                                        />
+                                        <Button onClick={handleAskFollowUp} disabled={isReplying || !followUpQuery.trim()}>Send</Button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </ScrollArea>
                 <DialogFooter className="pt-4 border-t">
                   <DialogClose asChild>
-                    <Button type="button" onClick={() => onQuestionUpdate({...question, solution})}>Save & Close</Button>
+                    <Button type="button" variant="secondary">Close</Button>
                   </DialogClose>
                 </DialogFooter>
               </DialogContent>

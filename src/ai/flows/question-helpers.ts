@@ -4,17 +4,16 @@
  *
  * - getSolution - Generates a detailed solution for a given question.
  * - getTricks - Generates general tips and tricks for solving a given type of question.
+ * - askFollowUp - Answers follow-up questions about a problem.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import remarkGfm from 'remark-gfm';
-import ReactMarkdown from 'react-markdown';
-
 
 // Get Solution Flow
 const GetSolutionInputSchema = z.object({
     questionText: z.string().describe("The text of the aptitude question."),
+    options: z.array(z.string()).optional().describe("The multiple-choice options for the question. For example, ['(A) 10', '(B) 20']."),
     theoryContext: z.string().optional().describe("The relevant theory content from the PDF to use as the primary context for solving the question."),
 });
 export type GetSolutionInput = z.infer<typeof GetSolutionInputSchema>;
@@ -50,6 +49,15 @@ Format the entire response in Markdown.
 
 Question:
 {{{questionText}}}
+
+{{#if options}}
+Available Options:
+{{#each options}}
+- {{{this}}}
+{{/each}}
+
+After providing the step-by-step solution, you MUST conclude by stating which option is the correct answer based on your derivation. For example: "Therefore, the correct option is (B) 20."
+{{/if}}
     `,
 });
 
@@ -61,6 +69,73 @@ const getSolutionFlow = ai.defineFlow(
     },
     async (input) => {
         const {output} = await solutionPrompt(input);
+        return output!;
+    }
+);
+
+
+// Ask Follow Up Flow
+const ChatMessageSchema = z.object({
+  role: z.enum(['user', 'model']),
+  content: z.string(),
+});
+
+const AskFollowUpInputSchema = z.object({
+  questionText: z.string().describe("The original aptitude question."),
+  options: z.array(z.string()).optional().describe("The multiple-choice options for the question."),
+  solution: z.string().describe("The generated solution to the original question."),
+  theoryContext: z.string().optional().describe("The theory context related to the question."),
+  chatHistory: z.array(ChatMessageSchema).optional().describe("The history of the conversation so far."),
+  userQuery: z.string().describe("The user's latest follow-up question."),
+});
+export type AskFollowUpInput = z.infer<typeof AskFollowUpInputSchema>;
+
+const AskFollowUpOutputSchema = z.object({
+    answer: z.string().describe("The AI's answer to the user's follow-up question, formatted in Markdown."),
+});
+export type AskFollowUpOutput = z.infer<typeof AskFollowUpOutputSchema>;
+
+export async function askFollowUp(input: AskFollowUpInput): Promise<AskFollowUpOutput> {
+  return askFollowUpFlow(input);
+}
+
+const followUpPrompt = ai.definePrompt({
+  name: 'askFollowUpPrompt',
+  input: { schema: AskFollowUpInputSchema },
+  output: { schema: AskFollowUpOutputSchema },
+  prompt: `You are an expert aptitude test tutor engaged in a conversation with a student.
+The student has a follow-up question about a specific aptitude problem and its solution.
+Your task is to answer the student's query based on the provided context. Be helpful, clear, and concise.
+
+Here is the full context of the problem:
+Original Question: {{{questionText}}}
+{{#if options}}
+Options: {{#each options}}{{{this}}}{{/each}}
+{{/if}}
+Solution: {{{solution}}}
+{{#if theoryContext}}
+Relevant Theory: {{{theoryContext}}}{{/if}}
+
+Below is the conversation history. The user's latest question is at the end. Provide a direct answer to that question.
+{{#if chatHistory}}
+{{#each chatHistory}}
+**{{this.role}}**: {{this.content}}
+{{/each}}
+{{/if}}
+**user**: {{{userQuery}}}
+
+**model**:
+  `,
+});
+
+const askFollowUpFlow = ai.defineFlow(
+    {
+        name: 'askFollowUpFlow',
+        inputSchema: AskFollowUpInputSchema,
+        outputSchema: AskFollowUpOutputSchema,
+    },
+    async (input) => {
+        const {output} = await followUpPrompt(input);
         return output!;
     }
 );

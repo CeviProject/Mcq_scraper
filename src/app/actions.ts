@@ -1,7 +1,7 @@
 'use server';
 
 import { contentSegregation, ContentSegregationInput, ContentSegregationOutput } from '@/ai/flows/content-segregation';
-import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksInput, GetTricksOutput } from '@/ai/flows/question-helpers';
+import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksInput, GetTricksOutput, askFollowUp, AskFollowUpInput, AskFollowUpOutput } from '@/ai/flows/question-helpers';
 
 export async function segregateContentAction(input: ContentSegregationInput): Promise<ContentSegregationOutput | { error: string }> {
   try {
@@ -30,5 +30,15 @@ export async function getTricksAction(input: GetTricksInput): Promise<GetTricksO
     } catch (error) {
         console.error('Error getting tricks:', error);
         return { error: 'Failed to generate tricks. Please try again.' };
+    }
+}
+
+export async function askFollowUpAction(input: AskFollowUpInput): Promise<AskFollowUpOutput | { error: string }> {
+    try {
+        const result = await askFollowUp(input);
+        return result;
+    } catch (error) {
+        console.error('Error in follow-up conversation:', error);
+        return { error: 'Failed to get an answer. Please try again.' };
     }
 }

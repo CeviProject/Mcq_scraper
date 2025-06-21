@@ -48,6 +48,7 @@ export default function AptitudeAceClient() {
                   difficulty: 'Not Set',
                   isUnique: false,
                   solution: 'No solution added yet.',
+                  chatHistory: [],
                   sourceFile: file.name,
                 }));
 
