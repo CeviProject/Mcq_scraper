@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -66,6 +65,7 @@ export default function LoginForm() {
                 <Auth
                     supabaseClient={supabase}
                     redirectTo={`${baseUrl}/auth/callback`}
+                    providers={[]}
                     appearance={{
                         theme: ThemeSupa,
                         variables: {
