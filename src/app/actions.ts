@@ -113,52 +113,13 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
             throw new Error("Authentication error: You must be logged in to delete documents.");
         }
 
-        const { data: doc, error: docError } = await supabase
-            .from('documents')
-            .select('id')
-            .eq('id', documentId)
-            .eq('user_id', user.id)
-            .single();
-
-        if (docError || !doc) {
-            throw new Error("Document not found or you don't have permission to delete it.");
-        }
-        
-        const { data: questionIds, error: questionIdsError } = await supabase
-            .from('questions')
-            .select('id')
-            .eq('document_id', documentId);
-
-        if (questionIdsError) {
-            throw new Error(`Failed to retrieve associated questions: ${questionIdsError.message}`);
-        }
-
-        if (questionIds && questionIds.length > 0) {
-            const idsToDelete = questionIds.map(q => q.id);
-            
-            const { error: attemptsError } = await supabase
-                .from('test_attempts')
-                .delete()
-                .in('question_id', idsToDelete);
-
-            if (attemptsError) {
-                throw new Error(`Failed to delete associated test history: ${attemptsError.message}`);
-            }
-        }
-        
-        const { error: questionsError } = await supabase
-            .from('questions')
-            .delete()
-            .eq('document_id', documentId);
-        
-        if (questionsError) {
-            throw new Error(`Failed to delete associated questions: ${questionsError.message}`);
-        }
-
+        // With ON DELETE CASCADE enabled in the database, we only need to delete the parent document.
+        // The database will automatically handle deleting all associated questions and test attempts.
         const { error: documentError } = await supabase
             .from('documents')
             .delete()
-            .eq('id', documentId);
+            .eq('id', documentId)
+            .eq('user_id', user.id); // RLS is also in effect, but this adds an explicit check.
 
         if (documentError) {
             throw new Error(`Failed to delete document: ${documentError.message}`);
@@ -305,7 +266,11 @@ export async function batchSolveQuestionsAction(
             }).filter(Boolean);
 
 
-            const { error: updateError } = await supabase.from('questions').upsert(updates as Question[]);
+            const { error: updateError } = await supabase.from('questions').upsert(updates as Question[], {
+                onConflict: 'id',
+                ignoreDuplicates: false, 
+            });
+
             if (updateError) {
                 if (updateError.message.includes('violates row-level security policy')) {
                      throw new Error("Database security error: You do not have permission to update these questions.");
