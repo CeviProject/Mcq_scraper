@@ -291,7 +291,12 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
         }));
         onQuestionsUpdate(updates);
         
-        const solvedQuestionsMap = new Map(updates.map(sq => [sq.id, sq]));
+        const solvedQuestionsMap = new Map(result.solvedQuestions.map(sq => [sq.id, {
+            solution: sq.solution,
+            correct_option: sq.correctOption,
+            difficulty: sq.difficulty
+        }]));
+
         const finalTest = test.map(q => {
             const solvedData = solvedQuestionsMap.get(q.id);
             return solvedData ? { ...q, ...solvedData } : q;

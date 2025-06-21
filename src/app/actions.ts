@@ -103,11 +103,7 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value
-                },
-            },
+            cookies: { get: (name: string) => cookieStore.get(name)?.value },
         }
     );
 
@@ -261,7 +257,9 @@ export async function generateTestFeedbackAction(input: Omit<GenerateTestFeedbac
 }
 
 
-export async function batchSolveQuestionsAction(input: Omit<BatchSolveInput, 'apiKey'>): Promise<BatchSolveOutput | { error: string }> {
+export async function batchSolveQuestionsAction(
+    input: Omit<BatchSolveInput, 'apiKey'>
+): Promise<BatchSolveOutput | { error: string }> {
     const cookieStore = cookies();
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -281,17 +279,34 @@ export async function batchSolveQuestionsAction(input: Omit<BatchSolveInput, 'ap
         const result = await batchSolveQuestions({ ...input, apiKey });
 
         if (result.solvedQuestions && result.solvedQuestions.length > 0) {
-            const updates = result.solvedQuestions.map(sq => ({
-                id: sq.id,
-                solution: sq.solution,
-                correct_option: sq.correctOption,
-                difficulty: sq.difficulty,
-                user_id: user.id,
-            }));
+            
+            const solvedQuestionMap = new Map(result.solvedQuestions.map(sq => [sq.id, sq]));
+            const questionIds = Array.from(solvedQuestionMap.keys());
+            
+            const { data: originalQuestions, error: fetchError } = await supabase
+                .from('questions')
+                .select('*')
+                .in('id', questionIds)
+                .eq('user_id', user.id);
 
-            const { error: updateError } = await supabase.from('questions').upsert(updates, { defaultToNull: false });
+            if (fetchError) {
+                throw new Error(`Failed to fetch original questions for update: ${fetchError.message}`);
+            }
+
+            const updates = originalQuestions.map(originalQ => {
+                const solvedData = solvedQuestionMap.get(originalQ.id);
+                if (!solvedData) return null;
+                return {
+                    ...originalQ,
+                    solution: solvedData.solution,
+                    correct_option: solvedData.correctOption,
+                    difficulty: solvedData.difficulty,
+                };
+            }).filter(Boolean);
+
+
+            const { error: updateError } = await supabase.from('questions').upsert(updates as Question[]);
             if (updateError) {
-                // The RLS policy message is not very user-friendly, so we provide a clearer one.
                 if (updateError.message.includes('violates row-level security policy')) {
                      throw new Error("Database security error: You do not have permission to update these questions.");
                 }
