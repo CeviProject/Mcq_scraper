@@ -15,6 +15,7 @@ import ReactMarkdown from 'react-markdown';
 // Get Solution Flow
 const GetSolutionInputSchema = z.object({
     questionText: z.string().describe("The text of the aptitude question."),
+    theoryContext: z.string().optional().describe("The relevant theory content from the PDF to use as the primary context for solving the question."),
 });
 export type GetSolutionInput = z.infer<typeof GetSolutionInputSchema>;
 
@@ -32,11 +33,23 @@ const solutionPrompt = ai.definePrompt({
     input: {schema: GetSolutionInputSchema},
     output: {schema: GetSolutionOutputSchema},
     prompt: `You are an expert aptitude test tutor. A student needs help with a question.
-    Provide a clear, step-by-step solution to the following question. Explain the logic and calculations involved.
-    Format the entire response in Markdown.
+Your primary goal is to use the provided theory context to answer the question. Only if the theory is insufficient or not provided, should you use your general knowledge.
 
-    Question:
-    {{{questionText}}}
+{{#if theoryContext}}
+First, carefully review the following theory content extracted from the student's document:
+--- THEORY CONTEXT ---
+{{{theoryContext}}}
+--- END OF THEORY CONTEXT ---
+Based on this theory, provide a clear, step-by-step solution to the question below.
+{{else}}
+Provide a clear, step-by-step solution to the following question using your expertise.
+{{/if}}
+
+Explain the logic and calculations involved.
+Format the entire response in Markdown.
+
+Question:
+{{{questionText}}}
     `,
 });
 

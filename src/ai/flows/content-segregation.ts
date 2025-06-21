@@ -40,19 +40,21 @@ const prompt = ai.definePrompt({
   name: 'contentSegregationPrompt',
   input: {schema: ContentSegregationInputSchema},
   output: {schema: ContentSegregationOutputSchema},
-  prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and separate it into two distinct categories: theory and questions.
+  prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and meticulously separate it into two categories: theory and questions.
 
-  Here's the content of the PDF:
-  {{media url=pdfDataUri}}
+The PDF content is provided below:
+{{media url=pdfDataUri}}
 
-  1.  **Extract Theory**: Identify and extract all theory, explanations, and concepts. Preserve the original formatting, including paragraphs, lists, and tables. Return this content as a single string formatted with Markdown.
+Your goal is to be exhaustive. **Assume everything in the document is either theory or a question.**
 
-  2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. For each question:
-      - Extract the full question text. Do not include the question number (e.g., "1.", "Q2.", etc.).
-      - If the question has multiple-choice options, extract them into an array of strings. Include the option label (e.g., "(A)", "1)") as part of the string.
-      - If there are no options, do not include the 'options' field.
+1.  **Extract Theory**: Identify and extract ALL content that is not a direct question or its options. This includes introduction paragraphs, topic explanations, formulas, definitions, examples, worked-out solutions within the theory section, and any other explanatory text. Preserve the original formatting as much as possible, including paragraphs, lists, and tables. Return this content as a single, comprehensive string formatted with Markdown. Be thorough and ensure no theoretical content is missed.
 
-  Return the extracted theory and the array of questions in the specified structured format.
+2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. For each question:
+    - Extract the full question text. Do not include the question number (e.g., "1.", "Q2.").
+    - If the question has multiple-choice options, extract them into an array of strings. Include the option label (e.g., "(A)", "1)") as part of the string.
+    - If there are no options, do not include the 'options' field.
+
+Return the extracted theory and the array of questions in the specified structured format.
   `,
 });
 

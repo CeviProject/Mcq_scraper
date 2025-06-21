@@ -130,7 +130,7 @@ export default function AptitudeAceClient() {
             <TheoryZoneTab contents={segregatedContents} />
           </TabsContent>
           <TabsContent value="questions" className="mt-6">
-            <QuestionBankTab questions={allQuestions} onQuestionUpdate={handleQuestionUpdate} />
+            <QuestionBankTab questions={allQuestions} onQuestionUpdate={handleQuestionUpdate} segregatedContents={segregatedContents} />
           </TabsContent>
           <TabsContent value="test-generator" className="mt-6">
             <TestGeneratorTab questions={allQuestions} />

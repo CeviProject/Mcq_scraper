@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react';
-import { Question } from '@/lib/types';
+import { Question, SegregatedContent } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ListChecks, Tag, Sparkles, File, BookCopy, Wand2, Loader2 } from 'lucide-react';
+import { ListChecks, Sparkles, File, BookCopy, Wand2, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getSolutionAction, getTricksAction } from '@/app/actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,11 +23,12 @@ import remarkGfm from 'remark-gfm';
 interface QuestionBankTabProps {
   questions: Question[];
   onQuestionUpdate: (question: Question) => void;
+  segregatedContents: SegregatedContent[];
 }
 
 const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard', 'Not Set'];
 
-function QuestionItem({ question, onQuestionUpdate }: { question: Question, onQuestionUpdate: (question: Question) => void }) {
+function QuestionItem({ question, onQuestionUpdate, theory }: { question: Question, onQuestionUpdate: (question: Question) => void, theory?: string }) {
   const [topic, setTopic] = useState(question.topic);
   const [solution, setSolution] = useState(question.solution);
   const [aiSolution, setAiSolution] = useState<string | null>(null);
@@ -38,7 +39,7 @@ function QuestionItem({ question, onQuestionUpdate }: { question: Question, onQu
 
   const handleGenerateSolution = async () => {
     setIsGeneratingSolution(true);
-    const result = await getSolutionAction({ questionText: question.text });
+    const result = await getSolutionAction({ questionText: question.text, theoryContext: theory });
     if ('error' in result) {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     } else {
@@ -122,7 +123,10 @@ function QuestionItem({ question, onQuestionUpdate }: { question: Question, onQu
                             {isGeneratingSolution && <div className="flex items-center space-x-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /><span>Generating...</span></div>}
                             {aiSolution && <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{aiSolution}</ReactMarkdown>}
                             {!aiSolution && !isGeneratingSolution && (
-                                <Button onClick={handleGenerateSolution}><Wand2 className="w-4 h-4 mr-2" />Generate AI Solution</Button>
+                                <div className="space-y-2">
+                                  <p className="text-sm text-muted-foreground">The AI will first attempt to use the theory from the source PDF. If that's not sufficient, it will use its general knowledge.</p>
+                                  <Button onClick={handleGenerateSolution}><Wand2 className="w-4 h-4 mr-2" />Generate AI Solution</Button>
+                                </div>
                             )}
                         </div>
                         
@@ -172,7 +176,7 @@ function QuestionItem({ question, onQuestionUpdate }: { question: Question, onQu
   )
 }
 
-export default function QuestionBankTab({ questions, onQuestionUpdate }: QuestionBankTabProps) {
+export default function QuestionBankTab({ questions, onQuestionUpdate, segregatedContents }: QuestionBankTabProps) {
   const [topicFilter, setTopicFilter] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [uniquenessFilter, setUniquenessFilter] = useState<'All' | 'Unique' | 'Common'>('All');
@@ -254,7 +258,10 @@ export default function QuestionBankTab({ questions, onQuestionUpdate }: Questio
         <h3 className="text-xl font-semibold">
           {filteredQuestions.length} Question{filteredQuestions.length === 1 ? '' : 's'} Found
         </h3>
-        {filteredQuestions.map(q => <QuestionItem key={q.id} question={q} onQuestionUpdate={onQuestionUpdate} />)}
+        {filteredQuestions.map(q => {
+          const theory = segregatedContents.find(c => c.sourceFile === q.sourceFile)?.theory;
+          return <QuestionItem key={q.id} question={q} onQuestionUpdate={onQuestionUpdate} theory={theory} />
+        })}
       </div>
     </div>
   );
