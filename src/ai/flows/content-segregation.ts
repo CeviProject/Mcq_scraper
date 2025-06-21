@@ -56,6 +56,7 @@ const contentSegregationFlow = ai.defineFlow(
 
     const prompt = dynamicAi.definePrompt({
       name: 'contentSegregationPrompt_dynamic',
+      model: 'googleai/gemini-1.5-pro-latest',
       input: {schema: ContentSegregationInputSchema},
       output: {schema: ContentSegregationOutputSchema},
       prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and meticulously separate it into two categories: theory and questions.

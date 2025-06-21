@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import type { Session, Profile } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
+import type { CookieOptions } from '@supabase/supabase-js';
 
 export default async function Home() {
   const cookieStore = cookies();
@@ -16,8 +17,6 @@ export default async function Home() {
   const isSupabaseConfigured = supabaseUrl && !supabaseUrl.includes('YOUR_SUPABASE_URL_HERE') && supabaseAnonKey && !supabaseAnonKey.includes('YOUR_SUPABASE_ANON_KEY_HERE');
   const isBaseUrlConfigured = baseUrl && baseUrl.startsWith('http');
   
-  // The AI key check is removed from here, as the key can now be user-provided.
-  // The app will show a toast error if an AI action is attempted without a key.
   if (!isSupabaseConfigured || !isBaseUrlConfigured) {
     return (
         <main className="flex h-screen w-full items-center justify-center p-6">
@@ -53,15 +52,32 @@ export default async function Home() {
         get(name: string) {
           return cookieStore.get(name)?.value
         },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing user sessions.
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options })
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing user sessions.
+          }
+        },
       },
     }
   );
 
-  const { data: { session }} = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
   
   let profile: Profile | null = null;
-  if (session) {
-      const { data } = await supabase.from('profiles').select('id, username, gemini_api_key').eq('id', session.user.id).single();
+  if (user) {
+      const { data } = await supabase.from('profiles').select('id, username, gemini_api_key').eq('id', user.id).single();
       profile = data;
   }
 
