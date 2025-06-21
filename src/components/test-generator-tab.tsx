@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw } from 'lucide-react';
+import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { generateTestFeedbackAction } from '@/app/actions';
@@ -20,6 +20,8 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { cn, normalizeOption } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
 
 type TestStatus = 'configuring' | 'in-progress' | 'results';
 const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard'];
@@ -148,6 +150,7 @@ function TestResults({
 export default function TestGeneratorTab({ questions }: { questions: Question[] }) {
   const [topicFilter, setTopicFilter] = useState('All');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
+  const [sourceFileFilter, setSourceFileFilter] = useState<string[]>([]);
   const [numQuestions, setNumQuestions] = useState(10);
   
   const [status, setStatus] = useState<TestStatus>('configuring');
@@ -164,13 +167,16 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
       return ['All', ...Array.from(topics)];
   }, [questions]);
   
+  const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
+  
   const questionsWithSolutions = useMemo(() => questions.filter(q => q.solution && q.solution !== 'No solution added yet.' && q.correctOption), [questions]);
 
   const handleGenerateTest = () => {
     const filtered = questionsWithSolutions.filter(q => {
       const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
-      return topicMatch && difficultyMatch;
+      const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile);
+      return topicMatch && difficultyMatch && sourceFileMatch;
     });
 
     if (filtered.length < numQuestions) {
@@ -279,8 +285,8 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
         <CardTitle>Create a Mock Test</CardTitle>
         <CardDescription>Set your criteria and generate a custom practice test. Only questions with generated solutions are available.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div className="space-y-2 col-span-full">
             <Label>Available for test:</Label>
             <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{questionsWithSolutions.length}</span> questions have solutions and can be used in tests.</p>
         </div>
@@ -314,6 +320,34 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
             max={questionsWithSolutions.length}
           />
         </div>
+        <div className="space-y-2">
+            <Label htmlFor="source-filter">Source PDF</Label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full justify-between">
+                  {sourceFileFilter.length === 0 ? 'All Sources' : sourceFileFilter.length === 1 ? sourceFileFilter[0] : `${sourceFileFilter.length} sources selected`}
+                  <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                <DropdownMenuLabel>Filter by Source File</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {sourceFiles.map(file => (
+                    <DropdownMenuCheckboxItem
+                        key={file}
+                        checked={sourceFileFilter.includes(file)}
+                        onCheckedChange={checked => {
+                            setSourceFileFilter(prev => 
+                                checked ? [...prev, file] : prev.filter(f => f !== file)
+                            )
+                        }}
+                    >
+                        {file}
+                    </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
       </CardContent>
       <CardFooter>
         <Button onClick={handleGenerateTest} className="w-full" disabled={questionsWithSolutions.length === 0}>

@@ -36,35 +36,35 @@ export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-        <Card className="md:col-span-1">
-            <CardHeader>
-                <CardTitle className="text-lg">Source Files</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-                <div className="flex flex-col gap-1">
-                    {contents.map((content) => (
-                        <Button 
-                            key={content.sourceFile}
-                            variant="ghost"
-                            className={cn("w-full justify-start text-left h-auto p-2", selectedFile === content.sourceFile && "bg-muted font-semibold")}
-                            onClick={() => setSelectedFile(content.sourceFile)}
-                        >
-                            <FileText className="w-4 h-4 mr-2 shrink-0" />
-                            <span className="truncate">{content.sourceFile}</span>
-                        </Button>
-                    ))}
+    <Card className="h-[75vh] flex flex-col">
+        <CardHeader>
+            <CardTitle>Theory Zone</CardTitle>
+            <CardDescription>Browse the theory content extracted from your uploaded PDFs.</CardDescription>
+        </CardHeader>
+        <div className="flex-grow grid grid-cols-1 md:grid-cols-4 gap-0 border-t overflow-hidden">
+            <ScrollArea className="md:col-span-1 h-full border-r">
+                <div className="p-2">
+                    <h4 className="font-semibold text-sm p-2">Source Files</h4>
+                    <div className="flex flex-col gap-1">
+                        {contents.map((content) => (
+                            <Button 
+                                key={content.sourceFile}
+                                variant="ghost"
+                                className={cn(
+                                    "w-full justify-start text-left h-auto p-2", 
+                                    selectedFile === content.sourceFile && "bg-muted font-semibold"
+                                )}
+                                onClick={() => setSelectedFile(content.sourceFile)}
+                            >
+                                <FileText className="w-4 h-4 mr-2 shrink-0" />
+                                <span className="truncate">{content.sourceFile}</span>
+                            </Button>
+                        ))}
+                    </div>
                 </div>
-            </CardContent>
-        </Card>
-
-        <Card className="md:col-span-3">
-            <CardHeader>
-                <CardTitle>Theory Content</CardTitle>
-                {selectedFile && <CardDescription>Key concepts and formulas from <span className="font-semibold text-foreground">{selectedFile}</span>.</CardDescription>}
-            </CardHeader>
-            <CardContent>
-                <ScrollArea className="h-[65vh] w-full rounded-md border p-4">
+            </ScrollArea>
+            <ScrollArea className="md:col-span-3 h-full">
+                <div className="p-6">
                   {selectedContent ? (
                     <ReactMarkdown
                         className="prose prose-sm dark:prose-invert max-w-none"
@@ -74,11 +74,14 @@ export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
                         {selectedContent.theory}
                     </ReactMarkdown>
                   ) : (
-                    <p className="text-muted-foreground p-4 text-center">Select a file to view its theory.</p>
+                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                        <BookOpen className="w-12 h-12 mb-4"/>
+                        <p>Select a file to view its theory content.</p>
+                    </div>
                   )}
-                </ScrollArea>
-            </CardContent>
-        </Card>
-    </div>
+                </div>
+            </ScrollArea>
+        </div>
+    </Card>
   );
 }

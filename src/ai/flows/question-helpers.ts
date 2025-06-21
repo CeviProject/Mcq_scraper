@@ -165,9 +165,11 @@ const tricksPrompt = ai.definePrompt({
     name: 'getTricksPrompt',
     input: {schema: GetTricksInputSchema},
     output: {schema: GetTricksOutputSchema},
-    prompt: `You are an expert aptitude test coach. A student wants to know the best strategies for a certain type of problem.
-    Based on the question below, identify the general topic (e.g., 'Percentages', 'Work and Time', 'Permutations', etc.).
-    Then, provide a list of general tips, common formulas, and quick tricks for solving questions of THAT TOPIC. Do not solve the specific question provided.
+    prompt: `You are an expert aptitude test coach. A student wants to know the best strategies for a specific type of problem.
+    Analyze the structure and content of the sample question below.
+    Provide a list of targeted tips, relevant formulas, and quick tricks specifically for solving questions of this particular type.
+    For example, if the question is about "boats and streams", give tricks for that, not just for "speed and distance". If it's about "compound interest calculated quarterly", give tricks for that, not just for "interest".
+    Do not solve the specific question provided. Focus on the underlying pattern.
     Format the entire response in Markdown, using lists and bold text to make it easy to read.
 
     Sample Question:
