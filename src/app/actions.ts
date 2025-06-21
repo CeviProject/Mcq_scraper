@@ -151,8 +151,20 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
         if (!user) {
             throw new Error("Authentication error.");
         }
+
+        // Step 1: Verify the document exists and the user owns it.
+        const { data: docToRename, error: fetchError } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('id', documentId)
+            .eq('user_id', user.id)
+            .single();
+
+        if (fetchError || !docToRename) {
+            throw new Error("Original document not found or you don't have permission to edit it.");
+        }
         
-        // Check if a document with the new name already exists for this user
+        // Step 2: Check if a document with the new name already exists for this user
         const { data: existing, error: existingError } = await supabase
             .from('documents')
             .select('id')
@@ -169,27 +181,22 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error(`A document with the name "${newName}" already exists.`);
         }
 
-
-        const { data: updatedDocs, error } = await supabase
+        // Step 3: Perform the update
+        const { data: updatedDoc, error: updateError } = await supabase
             .from('documents')
             .update({ source_file: newName })
-            .eq('id', documentId)
-            .eq('user_id', user.id)
+            .eq('id', documentId) // We know this ID is valid and owned by the user
             .select()
+            .single(); // Since we verified it exists, .single() is now safe.
         
-        if (error) {
-            // The explicit check above handles unique constraint, but this is a good fallback.
-            if (error.message.includes('unique constraint')) {
+        if (updateError) {
+            if (updateError.message.includes('unique constraint')) {
                 throw new Error(`A document with the name "${newName}" already exists.`);
             }
-            throw new Error(`Failed to rename document: ${error.message}`);
-        }
-
-        if (!updatedDocs || updatedDocs.length === 0) {
-            throw new Error("Document not found or you don't have permission to rename it.");
+            throw new Error(`Failed to rename document: ${updateError.message}`);
         }
         
-        return { updatedDocument: updatedDocs[0] as Document };
+        return { updatedDocument: updatedDoc as Document };
 
     } catch (error: any) {
         console.error('Error renaming document:', error);
