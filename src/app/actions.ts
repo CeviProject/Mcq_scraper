@@ -151,20 +151,45 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
         if (!user) {
             throw new Error("Authentication error.");
         }
+        
+        // Check if a document with the new name already exists for this user
+        const { data: existing, error: existingError } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('source_file', newName)
+            .neq('id', documentId) // Exclude the current document from the check
+            .limit(1);
 
-        const { data: updatedDoc, error } = await supabase
+        if (existingError) {
+             throw new Error(`Database error checking for existing name: ${existingError.message}`);
+        }
+        
+        if (existing && existing.length > 0) {
+            throw new Error(`A document with the name "${newName}" already exists.`);
+        }
+
+
+        const { data: updatedDocs, error } = await supabase
             .from('documents')
             .update({ source_file: newName })
             .eq('id', documentId)
             .eq('user_id', user.id)
             .select()
-            .single();
         
         if (error) {
+            // The explicit check above handles unique constraint, but this is a good fallback.
+            if (error.message.includes('unique constraint')) {
+                throw new Error(`A document with the name "${newName}" already exists.`);
+            }
             throw new Error(`Failed to rename document: ${error.message}`);
         }
+
+        if (!updatedDocs || updatedDocs.length === 0) {
+            throw new Error("Document not found or you don't have permission to rename it.");
+        }
         
-        return { updatedDocument: updatedDoc as Document };
+        return { updatedDocument: updatedDocs[0] as Document };
 
     } catch (error: any) {
         console.error('Error renaming document:', error);
