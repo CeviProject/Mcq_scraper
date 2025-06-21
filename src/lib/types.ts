@@ -1,9 +1,25 @@
 import type { GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
+import type { User } from '@supabase/supabase-js';
 
 export type ChatMessage = {
   role: 'user' | 'model';
   content: string;
 };
+
+// Extends Supabase User to include profile data
+export type AppUser = User & {
+    profile: Profile;
+};
+
+// Represents the user profile stored in the 'profiles' table
+export type Profile = {
+    id: string;
+    username: string;
+    gemini_api_key?: string;
+};
+
+export type Session = import('@supabase/supabase-js').Session;
+
 
 // Represents a question as stored in the database
 export type Question = {

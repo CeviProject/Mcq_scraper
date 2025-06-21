@@ -9,6 +9,8 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {genkit} from 'genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 const ContentSegregationInputSchema = z.object({
@@ -17,6 +19,7 @@ const ContentSegregationInputSchema = z.object({
     .describe(
       "A PDF document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
+  apiKey: z.string().optional().describe("User's Gemini API key."),
 });
 export type ContentSegregationInput = z.infer<typeof ContentSegregationInputSchema>;
 
@@ -37,11 +40,25 @@ export async function contentSegregation(input: ContentSegregationInput): Promis
   return contentSegregationFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'contentSegregationPrompt',
-  input: {schema: ContentSegregationInputSchema},
-  output: {schema: ContentSegregationOutputSchema},
-  prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and meticulously separate it into two categories: theory and questions.
+const contentSegregationFlow = ai.defineFlow(
+  {
+    name: 'contentSegregationFlow',
+    inputSchema: ContentSegregationInputSchema,
+    outputSchema: ContentSegregationOutputSchema,
+  },
+  async (input) => {
+    const key = input.apiKey || process.env.GOOGLE_API_KEY;
+    if (!key) {
+        throw new Error("A Gemini API key is required. Please add it in Settings or set GOOGLE_API_KEY in your environment.");
+    }
+    
+    const dynamicAi = genkit({ plugins: [googleAI({ apiKey: key })] });
+
+    const prompt = dynamicAi.definePrompt({
+      name: 'contentSegregationPrompt_dynamic',
+      input: {schema: ContentSegregationInputSchema},
+      output: {schema: ContentSegregationOutputSchema},
+      prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and meticulously separate it into two categories: theory and questions.
 
 The PDF content is provided below:
 {{media url=pdfDataUri}}
@@ -57,16 +74,9 @@ Your goal is to be exhaustive. **Assume everything in the document is either the
     - If there are no options, do not include the 'options' field.
 
 Return the extracted theory and the array of questions in the specified structured format.
-  `,
-});
+      `,
+    });
 
-const contentSegregationFlow = ai.defineFlow(
-  {
-    name: 'contentSegregationFlow',
-    inputSchema: ContentSegregationInputSchema,
-    outputSchema: ContentSegregationOutputSchema,
-  },
-  async input => {
     const {output} = await prompt(input);
     return output!;
   }

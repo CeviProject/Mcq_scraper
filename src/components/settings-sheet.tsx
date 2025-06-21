@@ -5,49 +5,57 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Sun, Moon, LogOut, Loader2 } from "lucide-react";
+import { Sun, Moon, LogOut, Loader2, KeyRound } from "lucide-react";
 import React, { useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { Profile } from "@/lib/types";
 
 interface SettingsSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     theme: string;
-    setTheme: (theme: 'light' | 'dark') => void;
-    username: string;
-    setUsername: (name: string) => void;
+    onThemeChange: (theme: 'light' | 'dark') => void;
+    profile: Profile | null;
+    onProfileUpdate: (profile: Profile) => void;
     supabase: SupabaseClient;
 }
 
-export default function SettingsSheet({ open, onOpenChange, theme, setTheme, username, setUsername, supabase }: SettingsSheetProps) {
-    const [currentUsername, setCurrentUsername] = useState(username);
+export default function SettingsSheet({ open, onOpenChange, theme, onThemeChange, profile, onProfileUpdate, supabase }: SettingsSheetProps) {
+    const [currentUsername, setCurrentUsername] = useState(profile?.username || '');
+    const [apiKey, setApiKey] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
 
     React.useEffect(() => {
-        setCurrentUsername(username);
-    }, [username]);
+        if (profile) {
+            setCurrentUsername(profile.username);
+        }
+    }, [profile]);
 
     const handleSave = async () => {
+        if (!profile) return;
         setIsSaving(true);
         const finalUsername = currentUsername.trim() === '' ? 'Guest' : currentUsername.trim();
         
-        const { data: { user }} = await supabase.auth.getUser();
-        if (!user) {
-            toast({ variant: 'destructive', title: 'Not authenticated' });
-            setIsSaving(false);
-            return;
-        }
+        const updateData: Partial<Profile> = {
+            username: finalUsername,
+        };
 
-        const { error } = await supabase.from('profiles').update({ username: finalUsername }).eq('id', user.id);
+        if (apiKey.trim() !== '') {
+            updateData.gemini_api_key = apiKey.trim();
+        }
+        
+        const { error } = await supabase.from('profiles').update(updateData).eq('id', profile.id);
         
         if (error) {
             toast({ variant: 'destructive', title: 'Error saving settings', description: error.message });
         } else {
-            setUsername(finalUsername);
+            const updatedProfile = { ...profile, ...updateData };
+            onProfileUpdate(updatedProfile);
+            setApiKey(''); // Clear the input field after saving
             toast({ title: 'Settings saved!' });
             onOpenChange(false);
         }
@@ -79,21 +87,24 @@ export default function SettingsSheet({ open, onOpenChange, theme, setTheme, use
                         />
                     </div>
                     <div className="grid gap-3">
-                        <Label htmlFor="api-key">Gemini API Key</Label>
+                        <Label htmlFor="api-key" className="flex items-center gap-2">
+                           <KeyRound className="w-4 h-4" /> Your Gemini API Key
+                        </Label>
                         <Input
                             id="api-key"
                             type="password"
-                            placeholder="Set in .env.local"
-                            readOnly
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder={profile?.gemini_api_key ? '••••••••••••••••••••••' : 'Enter your API key'}
                             className="col-span-2 h-8"
                         />
                         <p className="text-xs text-muted-foreground col-span-2">
-                            For security, your API key must be set in the <code>.env.local</code> file. This field is for display only. Restart the server after changing the key.
+                            Your key is stored securely in the database. The app will use your key for all AI features. If left blank, it will use the developer's key (if available).
                         </p>
                     </div>
                     <div className="grid gap-3">
                         <Label>Theme</Label>
-                        <RadioGroup defaultValue={theme} onValueChange={(value) => setTheme(value as 'light' | 'dark')} className="flex items-center space-x-2">
+                        <RadioGroup defaultValue={theme} onValueChange={(value) => onThemeChange(value as 'light' | 'dark')} className="flex items-center space-x-2">
                              <Label htmlFor="theme-light" className="flex items-center gap-2 border rounded-md p-2 px-3 cursor-pointer has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary">
                                 <Sun className="h-4 w-4" />
                                 Light

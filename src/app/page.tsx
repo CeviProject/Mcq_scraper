@@ -2,7 +2,7 @@ import AptitudeAceClient from '@/components/aptitude-ace-client';
 import { Toaster } from "@/components/ui/toaster";
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, Profile } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
 
@@ -12,13 +12,13 @@ export default async function Home() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-  const googleApiKey = process.env.GOOGLE_API_KEY;
 
   const isSupabaseConfigured = supabaseUrl && !supabaseUrl.includes('YOUR_SUPABASE_URL_HERE') && supabaseAnonKey && !supabaseAnonKey.includes('YOUR_SUPABASE_ANON_KEY_HERE');
   const isBaseUrlConfigured = baseUrl && baseUrl.startsWith('http');
-  const isAiConfigured = googleApiKey && !googleApiKey.includes('YOUR_GEMINI_API_KEY_HERE');
-
-  if (!isSupabaseConfigured || !isBaseUrlConfigured || !isAiConfigured) {
+  
+  // The AI key check is removed from here, as the key can now be user-provided.
+  // The app will show a toast error if an AI action is attempted without a key.
+  if (!isSupabaseConfigured || !isBaseUrlConfigured) {
     return (
         <main className="flex h-screen w-full items-center justify-center p-6">
             <div className="w-full max-w-2xl">
@@ -36,9 +36,6 @@ export default async function Home() {
                           )}
                           {!isBaseUrlConfigured && (
                             <li><code>NEXT_PUBLIC_BASE_URL</code> (must be a valid URL, e.g., http://localhost:9002)</li>
-                          )}
-                          {!isAiConfigured && (
-                            <li><code>GOOGLE_API_KEY</code></li>
                           )}
                       </ul>
                   </AlertDescription>
@@ -62,9 +59,9 @@ export default async function Home() {
 
   const { data: { session }} = await supabase.auth.getSession();
   
-  let profile = null;
+  let profile: Profile | null = null;
   if (session) {
-      const { data } = await supabase.from('profiles').select('username').eq('id', session.user.id).single();
+      const { data } = await supabase.from('profiles').select('id, username, gemini_api_key').eq('id', session.user.id).single();
       profile = data;
   }
 

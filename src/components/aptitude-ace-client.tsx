@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2 } from 'lucide-react';
-import { Document, Question, TestResult, ChatMessage, Test } from '@/lib/types';
-import { segregateContentAction, batchSolveQuestionsAction } from '@/app/actions';
+import { Document, Question, TestResult, ChatMessage, Test, Profile } from '@/lib/types';
+import { segregateContentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js';
 // It's safe to assume config is valid here because page.tsx checks it.
 const supabase: SupabaseClient = createClient();
 
-export default function AptitudeAceClient({ session, profile }: { session: Session | null, profile: { username: string } | null }) {
+export default function AptitudeAceClient({ session, profile: initialProfile }: { session: Session | null, profile: Profile | null }) {
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -32,7 +32,7 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
   
   const [questionUiState, setQuestionUiState] = useState<Map<string, { userSelectedOption?: string; chatHistory?: ChatMessage[] }>>(new Map());
 
-  const [username, setUsername] = useState('Guest');
+  const [profile, setProfile] = useState(initialProfile);
   const [theme, setTheme] = useState('dark');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
@@ -83,13 +83,6 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(storedTheme);
   }, []);
-
-  useEffect(() => {
-    // Set username from profile passed from server
-    if (profile?.username) {
-      setUsername(profile.username);
-    }
-  }, [profile]);
 
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
       setTheme(newTheme);
@@ -233,8 +226,8 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
     }
   }, [toast]);
 
-  const handleUsernameChange = (newName: string) => {
-    setUsername(newName);
+  const handleProfileUpdate = (newProfile: Profile) => {
+    setProfile(newProfile);
   };
   
   if (isLoading) {
@@ -253,7 +246,7 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Aptitude Ace</h1>
           </div>
           <div className="ml-auto flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden md:block">Welcome, {username}</span>
+            <span className="text-sm text-muted-foreground hidden md:block">Welcome, {profile?.username || 'Guest'}</span>
             <Button variant="outline" size="icon" onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4" />
               <span className="sr-only">Settings</span>
@@ -309,9 +302,9 @@ export default function AptitudeAceClient({ session, profile }: { session: Sessi
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         theme={theme}
-        setTheme={handleThemeChange}
-        username={username}
-        setUsername={handleUsernameChange}
+        onThemeChange={handleThemeChange}
+        profile={profile}
+        onProfileUpdate={handleProfileUpdate}
         supabase={supabase}
       />
     </div>
