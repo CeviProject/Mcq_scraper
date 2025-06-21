@@ -129,6 +129,26 @@ export default function AptitudeAceClient() {
       return newContents;
     });
   }, []);
+  
+  const handleQuestionsUpdate = useCallback((updates: (Partial<Question> & { id: string })[]) => {
+    const updatesMap = new Map(updates.map(u => [u.id, u]));
+    
+    setSegregatedContents(prevContents => {
+      return prevContents.map(content => {
+        let contentHasChanged = false;
+        const newQuestions = content.questions.map(q => {
+          if (updatesMap.has(q.id)) {
+            contentHasChanged = true;
+            return { ...q, ...updatesMap.get(q.id)! };
+          }
+          return q;
+        });
+
+        return contentHasChanged ? { ...content, questions: newQuestions } : content;
+      });
+    });
+  }, []);
+
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -170,7 +190,11 @@ export default function AptitudeAceClient() {
             <QuestionBankTab questions={allQuestions} onQuestionUpdate={handleQuestionUpdate} segregatedContents={segregatedContents} />
           </TabsContent>
           <TabsContent value="test-generator" className="mt-6">
-            <TestGeneratorTab questions={allQuestions} onTestComplete={handleTestComplete} />
+            <TestGeneratorTab 
+              questions={allQuestions} 
+              onTestComplete={handleTestComplete} 
+              onQuestionsUpdate={handleQuestionsUpdate}
+            />
           </TabsContent>
         </Tabs>
       </div>

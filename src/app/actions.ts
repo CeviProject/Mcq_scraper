@@ -3,6 +3,7 @@
 import { contentSegregation, ContentSegregationInput, ContentSegregationOutput } from '@/ai/flows/content-segregation';
 import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksInput, GetTricksOutput, askFollowUp, AskFollowUpInput, AskFollowUpOutput } from '@/ai/flows/question-helpers';
 import { generateTestFeedback, GenerateTestFeedbackInput, GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
+import { batchSolveQuestions, BatchSolveInput, BatchSolveOutput } from '@/ai/flows/batch-question-solver';
 
 
 export async function segregateContentAction(input: ContentSegregationInput): Promise<ContentSegregationOutput | { error: string }> {
@@ -52,5 +53,16 @@ export async function generateTestFeedbackAction(input: GenerateTestFeedbackInpu
     } catch (error) {
         console.error('Error generating test feedback:', error);
         return { error: 'Failed to generate feedback. Please try again.' };
+    }
+}
+
+
+export async function batchSolveQuestionsAction(input: BatchSolveInput): Promise<BatchSolveOutput | { error: string }> {
+    try {
+        const result = await batchSolveQuestions(input);
+        return result;
+    } catch (error) {
+        console.error('Error batch solving questions:', error);
+        return { error: 'Failed to generate solutions for the test. Please try again.' };
     }
 }

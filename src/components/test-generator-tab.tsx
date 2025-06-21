@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { generateTestFeedbackAction } from '@/app/actions';
+import { batchSolveQuestionsAction, generateTestFeedbackAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from '@/components/ui/progress';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
@@ -129,10 +129,12 @@ function TestResults({
                           )
                       })}
                   </div>
-                  <div className="mt-4 p-4 bg-muted/50 rounded-md">
-                      <h4 className="font-semibold mb-2 text-sm">Explanation:</h4>
-                      <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{q.solution}</ReactMarkdown>
-                  </div>
+                  {q.solution && (
+                    <div className="mt-4 p-4 bg-muted/50 rounded-md">
+                        <h4 className="font-semibold mb-2 text-sm">Explanation:</h4>
+                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{q.solution}</ReactMarkdown>
+                    </div>
+                  )}
               </CardContent>
             </Card>
           ))}
@@ -143,7 +145,7 @@ function TestResults({
 }
 
 
-export default function TestGeneratorTab({ questions, onTestComplete }: { questions: Question[], onTestComplete: (result: TestResult) => void; }) {
+export default function TestGeneratorTab({ questions, onTestComplete, onQuestionsUpdate }: { questions: Question[], onTestComplete: (result: TestResult) => void; onQuestionsUpdate: (updates: (Partial<Question> & { id: string })[]) => void; }) {
   const [topicFilter, setTopicFilter] = useState('All');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [sourceFileFilter, setSourceFileFilter] = useState<string[]>([]);
@@ -155,6 +157,7 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
+  const [isGeneratingSolutions, setIsGeneratingSolutions] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [completedTest, setCompletedTest] = useState<TestResult | null>(null);
 
@@ -163,6 +166,12 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
   const handleFinishTest = useCallback(async () => {
       setIsLoadingFeedback(true);
       setStatus('results');
+
+      let score = 0;
+      generatedTest.forEach(q => {
+          const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
+          if (isCorrect) score++;
+      });
       
       const resultsForAI = generatedTest.map(q => ({
           questionText: q.text,
@@ -171,24 +180,22 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
           correctAnswer: q.correctOption,
           isCorrect: normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || ''),
       }));
-
-      const feedbackResult = await generateTestFeedbackAction({ results: resultsForAI });
-      
-      let score = 0;
-      generatedTest.forEach(q => {
-          const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
-          if (isCorrect) score++;
-      });
       
       const testResult: TestResult = {
         id: crypto.randomUUID(),
         date: new Date().toISOString(),
         questions: generatedTest,
         userAnswers,
-        feedback: 'error' in feedbackResult ? null : feedbackResult,
+        feedback: null,
         score,
         total: generatedTest.length,
       };
+
+      const feedbackResult = await generateTestFeedbackAction({ results: resultsForAI });
+      
+      if (!('error' in feedbackResult)) {
+        testResult.feedback = feedbackResult;
+      }
       
       onTestComplete(testResult);
       setCompletedTest(testResult);
@@ -228,13 +235,11 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
   const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
   
   const testableQuestions = useMemo(() => {
-    // A question is "testable" if it has options and a solution has been generated.
-    return questions.filter(q => 
-        q.options && q.options.length > 0 && q.solution
-    );
+    // A question is "testable" if it has options. The solution can be fetched on demand.
+    return questions.filter(q => q.options && q.options.length > 0);
   }, [questions]);
 
-  const handleGenerateTest = () => {
+  const handleGenerateTest = async () => {
     const filtered = testableQuestions.filter(q => {
       const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
@@ -253,14 +258,57 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
 
     const shuffled = filtered.sort(() => 0.5 - Math.random());
     const test = shuffled.slice(0, numQuestions);
-    setGeneratedTest(test);
-    setTimeLeft(test.length * timePerQuestion);
-    setStatus('in-progress');
-    setCurrentQuestionIndex(0);
-    setUserAnswers({});
-    setCompletedTest(null);
+
+    const questionsToSolve = test.filter(q => !q.solution);
+
+    if (questionsToSolve.length > 0) {
+        setIsGeneratingSolutions(true);
+        toast({
+            title: "Preparing Your Test...",
+            description: `Generating solutions for ${questionsToSolve.length} question(s). This may take a moment.`,
+        });
+        
+        const questionsForAI = questionsToSolve.map(q => ({
+            id: q.id,
+            questionText: q.text,
+            options: q.options,
+        }));
+
+        const result = await batchSolveQuestionsAction({ questions: questionsForAI });
+        setIsGeneratingSolutions(false);
+
+        if ('error' in result) {
+            toast({
+                variant: "destructive",
+                title: "Failed to Prepare Test",
+                description: result.error,
+            });
+            return;
+        }
+        
+        onQuestionsUpdate(result.solvedQuestions);
+        
+        const solvedQuestionsMap = new Map(result.solvedQuestions.map(sq => [sq.id, sq]));
+        const finalTest = test.map(q => {
+            const solvedData = solvedQuestionsMap.get(q.id);
+            return solvedData ? { ...q, ...solvedData } : q;
+        });
+        
+        startTest(finalTest);
+    } else {
+        startTest(test);
+    }
   };
   
+  const startTest = (test: Question[]) => {
+      setGeneratedTest(test);
+      setTimeLeft(test.length * timePerQuestion);
+      setStatus('in-progress');
+      setCurrentQuestionIndex(0);
+      setUserAnswers({});
+      setCompletedTest(null);
+  };
+
   const handleAnswerChange = (questionId: string, answer: string) => {
       setUserAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
@@ -339,7 +387,7 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         <div className="space-y-2 col-span-full">
             <Label>Available Questions for Test</Label>
-            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{testableQuestions.length}</span> questions are available. Tests are created from multiple-choice questions for which you have verified the answer in the Question Bank.</p>
+            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{testableQuestions.length}</span> questions are available. Tests are created from multiple-choice questions. Solutions will be generated on-the-fly if needed.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="test-topic">Topic</Label>
@@ -413,8 +461,18 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={handleGenerateTest} className="w-full" disabled={testableQuestions.length === 0}>
-          <Wand2 className="mr-2 h-4 w-4" /> Generate Test
+        <Button onClick={handleGenerateTest} className="w-full" disabled={testableQuestions.length === 0 || isGeneratingSolutions}>
+          {isGeneratingSolutions ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Preparing Test...
+            </>
+          ) : (
+            <>
+              <Wand2 className="mr-2 h-4 w-4" />
+              Generate Test
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>
