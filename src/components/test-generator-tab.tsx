@@ -96,7 +96,7 @@ function TestResults({
                            <div>
                                <h4 className="font-semibold mb-2">Areas for Improvement:</h4>
                                <div className="flex flex-wrap gap-2">
-                                   {feedback.areasOfWeakness.length > 0 ? feedback.areasOfWeakness.map(topic => <Badge key={topic} variant="destructive">{topic}</Badge>) : <p className="text-sm text-muted-foreground">Great job! No specific weaknesses found.</p>}
+                                   {feedback.areasOfWeakness.length > 0 ? feedback.areasOfWeakness.map((topic, index) => <Badge key={`${topic}-${index}`} variant="destructive">{topic}</Badge>) : <p className="text-sm text-muted-foreground">Great job! No specific weaknesses found.</p>}
                                </div>
                            </div>
                         </div>
@@ -235,7 +235,8 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
   
   const testableQuestions = useMemo(() => {
-    // A question is "testable" if it has options. The solution can be fetched on demand.
+    // A question is "testable" if it has options AND a solution.
+    // We can generate solutions on the fly now.
     return questions.filter(q => q.options && q.options.length > 0);
   }, [questions]);
 
