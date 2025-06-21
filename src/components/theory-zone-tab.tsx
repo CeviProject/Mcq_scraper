@@ -7,6 +7,8 @@ import { SegregatedContent } from '@/lib/types';
 import { BookOpen, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -66,7 +68,8 @@ export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
                   {selectedContent ? (
                     <ReactMarkdown
                         className="prose prose-sm dark:prose-invert max-w-none"
-                        remarkPlugins={[remarkGfm]}
+                        remarkPlugins={[remarkGfm, remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
                     >
                         {selectedContent.theory}
                     </ReactMarkdown>

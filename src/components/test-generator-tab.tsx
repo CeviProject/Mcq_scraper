@@ -17,6 +17,8 @@ import { Progress } from '@/components/ui/progress';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { cn, normalizeOption } from '@/lib/utils';
 
 type TestStatus = 'configuring' | 'in-progress' | 'results';
@@ -92,7 +94,7 @@ function TestResults({
                     {isLoadingFeedback && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /> Generating feedback...</div>}
                     {feedback && (
                         <div className="space-y-4">
-                           <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{feedback.overallFeedback}</ReactMarkdown>
+                           <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{feedback.overallFeedback}</ReactMarkdown>
                            <div>
                                <h4 className="font-semibold mb-2">Areas for Improvement:</h4>
                                <div className="flex flex-wrap gap-2">
@@ -131,7 +133,7 @@ function TestResults({
                   </div>
                   <div className="mt-4 p-4 bg-muted/50 rounded-md">
                       <h4 className="font-semibold mb-2 text-sm">Explanation:</h4>
-                      <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{q.solution}</ReactMarkdown>
+                      <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{q.solution}</ReactMarkdown>
                   </div>
               </CardContent>
             </Card>

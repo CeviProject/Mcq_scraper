@@ -18,6 +18,8 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { cn, normalizeOption } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -207,7 +209,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
                               <div className="flex justify-between items-center mb-2">
                                   <h4 className="font-semibold">Solution</h4>
                               </div>
-                               <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{question.solution}</ReactMarkdown>
+                               <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{question.solution}</ReactMarkdown>
                           </div>
                           
                           <Separator />
@@ -218,7 +220,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
                                       <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                                           {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>}
                                           <div className={`rounded-lg p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                              <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                                              <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.content}</ReactMarkdown>
                                           </div>
                                       </div>
                                   ))}
@@ -272,7 +274,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
                 <ScrollArea className="max-h-[70vh] -mx-6 px-6">
                     <div className="py-4 pr-6 min-h-[250px] flex flex-col">
                         {isGeneratingTricks && <div className="flex items-center space-x-2 text-muted-foreground m-auto"><Loader2 className="animate-spin h-4 w-4" /><span>Finding the best strategies...</span></div>}
-                        {aiTricks && <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{aiTricks}</ReactMarkdown>}
+                        {aiTricks && <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{aiTricks}</ReactMarkdown>}
                         {!aiTricks && !isGeneratingTricks && (
                             <div className="flex flex-col items-center justify-center text-center m-auto">
                                 <p className="text-muted-foreground mb-4">Click below to get general tips and tricks for this question's topic from AI.</p>

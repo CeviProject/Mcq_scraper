@@ -47,6 +47,7 @@ Provide a clear, step-by-step solution to the following question using your expe
 {{/if}}
 
 Explain the logic and calculations involved.
+When writing mathematical formulas or equations, use LaTeX syntax. For inline formulas, wrap them in single dollar signs (e.g., $ax^2 + bx + c = 0$). For block-level formulas, wrap them in double dollar signs (e.g., $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$).
 Format the entire response in Markdown.
 Based on the complexity of the question, set the 'difficulty' field to 'Easy', 'Medium', or 'Hard'.
 
@@ -109,6 +110,7 @@ const followUpPrompt = ai.definePrompt({
   prompt: `You are an expert aptitude test tutor engaged in a conversation with a student.
 The student has a follow-up question about a specific aptitude problem and its solution.
 Your task is to answer the student's query based on the provided context. Be helpful, clear, and concise.
+When writing mathematical formulas or equations, use LaTeX syntax. For inline formulas, wrap them in single dollar signs (e.g., $ax^2 + bx + c = 0$). For block-level formulas, wrap them in double dollar signs (e.g., $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$).
 
 Here is the full context of the problem:
 Original Question: {{{questionText}}}

@@ -48,7 +48,7 @@ The PDF content is provided below:
 
 Your goal is to be exhaustive. **Assume everything in the document is either theory or a question.**
 
-1.  **Extract Theory**: Identify and extract ALL content that is not a direct question or its options. This includes introduction paragraphs, topic explanations, formulas, definitions, examples, worked-out solutions within the theory section, and any other explanatory text. Preserve the original formatting as much as possible, including paragraphs, lists, and tables. Return this content as a single, comprehensive string formatted with Markdown. Be thorough and ensure no theoretical content is missed.
+1.  **Extract Theory**: Identify and extract ALL content that is not a direct question or its options. This includes introduction paragraphs, topic explanations, formulas, definitions, examples, worked-out solutions within the theory section, and any other explanatory text. Preserve the original formatting as much as possible, including paragraphs, lists, and tables. Return this content as a single, comprehensive string formatted with Markdown. When including mathematical formulas, use LaTeX syntax wrapped in '$' for inline math and '$$' for block math. Be thorough and ensure no theoretical content is missed.
 
 2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. For each question:
     - Extract the full question text. Do not include the question number (e.g., "1.", "Q2.").
