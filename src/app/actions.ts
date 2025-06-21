@@ -2,6 +2,8 @@
 
 import { contentSegregation, ContentSegregationInput, ContentSegregationOutput } from '@/ai/flows/content-segregation';
 import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksInput, GetTricksOutput, askFollowUp, AskFollowUpInput, AskFollowUpOutput } from '@/ai/flows/question-helpers';
+import { generateTestFeedback, GenerateTestFeedbackInput, GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
+
 
 export async function segregateContentAction(input: ContentSegregationInput): Promise<ContentSegregationOutput | { error: string }> {
   try {
@@ -40,5 +42,15 @@ export async function askFollowUpAction(input: AskFollowUpInput): Promise<AskFol
     } catch (error) {
         console.error('Error in follow-up conversation:', error);
         return { error: 'Failed to get an answer. Please try again.' };
+    }
+}
+
+export async function generateTestFeedbackAction(input: GenerateTestFeedbackInput): Promise<GenerateTestFeedbackOutput | { error: string }> {
+    try {
+        const result = await generateTestFeedback(input);
+        return result;
+    } catch (error) {
+        console.error('Error generating test feedback:', error);
+        return { error: 'Failed to generate feedback. Please try again.' };
     }
 }
