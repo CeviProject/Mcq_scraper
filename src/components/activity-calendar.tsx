@@ -3,7 +3,7 @@
 import React from 'react';
 import { eachDayOfInterval, format, startOfWeek, addDays, getMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface ActivityCalendarProps {
@@ -56,54 +56,56 @@ const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ data, title = "Acti
 
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base font-medium">{title}</CardTitle>
-        <CardDescription>Your test activity over the last year.</CardDescription>
-      </CardHeader>
-      <CardContent className="overflow-x-auto pb-4">
-        <div className="inline-block relative" style={{ paddingLeft: '24px' }}>
-          <div className="flex" style={{ marginLeft: '-2px' }}>
-            {monthLabels.map(({ label, weekIndex }) => (
-                <div key={label} className="text-xs text-muted-foreground absolute" style={{ left: `${24 + weekIndex * 14}px`, top: '-1.25rem' }}>
-                    {label}
-                </div>
-            ))}
-          </div>
-          <div className="flex">
-            <div className="flex flex-col gap-1 pr-2 text-xs text-muted-foreground text-right" style={{marginTop: '2px'}}>
-                <div className="h-2.5">Mon</div>
-                <div className="h-2.5" style={{marginTop: '4px'}}>Wed</div>
-                <div className="h-2.5" style={{marginTop: '4px'}}>Fri</div>
-            </div>
-            <div className="flex gap-1">
-                {weeks.map((week, i) => (
-                  <div key={i} className="flex flex-col gap-1">
-                    {week.map((day, j) => {
-                      if (!day || day > today) return <div key={j} className="h-2.5 w-2.5 rounded-sm bg-transparent" />;
-                      
-                      const dateKey = format(day, 'yyyy-MM-dd');
-                      const count = dateCounts.get(dateKey) || 0;
-                      return (
-                        <Tooltip key={dateKey} delayDuration={100}>
-                          <TooltipTrigger asChild>
-                            <div
-                              className={cn('h-2.5 w-2.5 rounded-sm', getColor(count))}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{count} test{count !== 1 ? 's' : ''} on {format(day, 'MMM d, yyyy')}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
+    <TooltipProvider>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium">{title}</CardTitle>
+          <CardDescription>Your test activity over the last year.</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto pb-4">
+          <div className="inline-block relative" style={{ paddingLeft: '24px' }}>
+            <div className="flex" style={{ marginLeft: '-2px' }}>
+              {monthLabels.map(({ label, weekIndex }) => (
+                  <div key={label} className="text-xs text-muted-foreground absolute" style={{ left: `${24 + weekIndex * 14}px`, top: '-1.25rem' }}>
+                      {label}
                   </div>
-                ))}
+              ))}
+            </div>
+            <div className="flex">
+              <div className="flex flex-col gap-1 pr-2 text-xs text-muted-foreground text-right" style={{marginTop: '2px'}}>
+                  <div className="h-2.5">Mon</div>
+                  <div className="h-2.5" style={{marginTop: '4px'}}>Wed</div>
+                  <div className="h-2.5" style={{marginTop: '4px'}}>Fri</div>
+              </div>
+              <div className="flex gap-1">
+                  {weeks.map((week, i) => (
+                    <div key={i} className="flex flex-col gap-1">
+                      {week.map((day, j) => {
+                        if (!day || day > today) return <div key={j} className="h-2.5 w-2.5 rounded-sm bg-transparent" />;
+                        
+                        const dateKey = format(day, 'yyyy-MM-dd');
+                        const count = dateCounts.get(dateKey) || 0;
+                        return (
+                          <Tooltip key={dateKey} delayDuration={100}>
+                            <TooltipTrigger asChild>
+                              <div
+                                className={cn('h-2.5 w-2.5 rounded-sm', getColor(count))}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{count} test{count !== 1 ? 's' : ''} on {format(day, 'MMM d, yyyy')}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  ))}
+              </div>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 };
 
