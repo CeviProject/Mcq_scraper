@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, LogOut, Loader2 } from "lucide-react";
 import React, { useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 interface SettingsSheetProps {
     open: boolean;
@@ -15,18 +18,45 @@ interface SettingsSheetProps {
     setTheme: (theme: 'light' | 'dark') => void;
     username: string;
     setUsername: (name: string) => void;
+    supabase: SupabaseClient;
 }
 
-export default function SettingsSheet({ open, onOpenChange, theme, setTheme, username, setUsername }: SettingsSheetProps) {
+export default function SettingsSheet({ open, onOpenChange, theme, setTheme, username, setUsername, supabase }: SettingsSheetProps) {
     const [currentUsername, setCurrentUsername] = useState(username);
+    const [isSaving, setIsSaving] = useState(false);
+    const { toast } = useToast();
+    const router = useRouter();
 
     React.useEffect(() => {
         setCurrentUsername(username);
     }, [username]);
 
-    const handleSave = () => {
-        setUsername(currentUsername);
-        onOpenChange(false);
+    const handleSave = async () => {
+        setIsSaving(true);
+        const finalUsername = currentUsername.trim() === '' ? 'Guest' : currentUsername.trim();
+        
+        const { data: { user }} = await supabase.auth.getUser();
+        if (!user) {
+            toast({ variant: 'destructive', title: 'Not authenticated' });
+            setIsSaving(false);
+            return;
+        }
+
+        const { error } = await supabase.from('profiles').update({ username: finalUsername }).eq('id', user.id);
+        
+        if (error) {
+            toast({ variant: 'destructive', title: 'Error saving settings', description: error.message });
+        } else {
+            setUsername(finalUsername);
+            toast({ title: 'Settings saved!' });
+            onOpenChange(false);
+        }
+        setIsSaving(false);
+    }
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.refresh(); // This will re-trigger the middleware and redirect to /login
     }
     
     return (
@@ -64,8 +94,15 @@ export default function SettingsSheet({ open, onOpenChange, theme, setTheme, use
                         </RadioGroup>
                     </div>
                 </div>
-                <SheetFooter>
-                    <Button type="submit" onClick={handleSave}>Save changes</Button>
+                <SheetFooter className="flex-col space-y-2 sm:flex-col sm:space-y-2">
+                    <Button type="submit" onClick={handleSave} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save changes
+                    </Button>
+                    <Button variant="outline" onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                    </Button>
                 </SheetFooter>
             </SheetContent>
         </Sheet>

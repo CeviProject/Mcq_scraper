@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SegregatedContent } from '@/lib/types';
+import { Document } from '@/lib/types';
 import { BookOpen, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -13,15 +13,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface TheoryZoneTabProps {
-  contents: SegregatedContent[];
+  documents: Document[];
 }
 
-export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
-  const [selectedFile, setSelectedFile] = useState<string | null>(contents.length > 0 ? contents[0].sourceFile : null);
+export default function TheoryZoneTab({ documents }: TheoryZoneTabProps) {
+  const [selectedFile, setSelectedFile] = useState<string | null>(documents.length > 0 ? documents[0].source_file : null);
 
-  const selectedContent = contents.find(c => c.sourceFile === selectedFile);
+  const selectedContent = documents.find(c => c.source_file === selectedFile);
 
-  if (contents.length === 0) {
+  if (documents.length === 0) {
     return (
         <Card className="flex flex-col items-center justify-center py-20 text-center">
             <CardHeader>
@@ -29,7 +29,7 @@ export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
                     <BookOpen className="h-12 w-12 text-muted-foreground" />
                 </div>
                 <CardTitle className="mt-4">Your Theory Zone is Empty</CardTitle>
-                <CardDescription>Upload some PDFs on the dashboard to see theory content here.</CardDescription>
+                <CardDescription>Upload some PDFs on the Upload tab to see theory content here.</CardDescription>
             </CardHeader>
         </Card>
     );
@@ -46,18 +46,18 @@ export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
                 <div className="p-2">
                     <h4 className="font-semibold text-sm p-2">Source Files</h4>
                     <div className="flex flex-col gap-1">
-                        {contents.map((content) => (
+                        {documents.map((content) => (
                             <Button 
-                                key={content.sourceFile}
+                                key={content.id}
                                 variant="ghost"
                                 className={cn(
                                     "w-full justify-start text-left h-auto p-2", 
-                                    selectedFile === content.sourceFile && "bg-muted font-semibold"
+                                    selectedFile === content.source_file && "bg-muted font-semibold"
                                 )}
-                                onClick={() => setSelectedFile(content.sourceFile)}
+                                onClick={() => setSelectedFile(content.source_file)}
                             >
                                 <FileText className="w-4 h-4 mr-2 shrink-0" />
-                                <span className="truncate">{content.sourceFile}</span>
+                                <span className="truncate">{content.source_file}</span>
                             </Button>
                         ))}
                     </div>
@@ -71,7 +71,7 @@ export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
                         remarkPlugins={[remarkGfm, remarkMath]}
                         rehypePlugins={[rehypeKatex]}
                     >
-                        {selectedContent.theory}
+                        {selectedContent.theory || ''}
                     </ReactMarkdown>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">

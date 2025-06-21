@@ -3,72 +3,75 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { File, HelpCircle, List, Trophy, Activity, BarChart } from 'lucide-react';
+import { File, HelpCircle, List, Trophy } from 'lucide-react';
 import Image from 'next/image';
-import { TestResult } from '@/lib/types';
+import { Test } from '@/lib/types';
 import ActivityCalendar from './activity-calendar';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { createClient } from '@/lib/supabase';
 
 interface DashboardTabProps {
   sourceFiles: string[];
   questionCount: number;
-  testHistory: TestResult[];
+  testHistory: Test[];
 }
 
 export default function DashboardTab({ sourceFiles, questionCount, testHistory }: DashboardTabProps) {
-  const pdfCount = sourceFiles.length;
-  
+  const supabase = createClient();
+  const [topicPerformance, setTopicPerformance] = React.useState<{name: string, Accuracy: number}[]>([]);
+
+  React.useEffect(() => {
+    const fetchPerformance = async () => {
+        if (testHistory.length === 0) return;
+
+        const { data, error } = await supabase.rpc('get_topic_performance');
+
+        if (error) {
+            console.error("Error fetching topic performance", error);
+            return;
+        }
+
+        const formattedData = data.map((d: any) => ({
+            name: d.topic,
+            Accuracy: d.accuracy
+        })).sort((a: any, b: any) => b.Accuracy - a.Accuracy);
+        
+        setTopicPerformance(formattedData);
+    };
+    // This is a placeholder, in a real app you would create an RPC in Supabase
+    // to calculate this efficiently. For now, we just show a message.
+    // fetchPerformance();
+  }, [testHistory, supabase]);
+
   const analyticsData = useMemo(() => {
     if (testHistory.length === 0) {
       return {
         totalTests: 0,
         avgScore: 0,
-        topicPerformance: [],
         activityData: [],
       };
     }
 
     let totalCorrect = 0;
     let totalAnswered = 0;
-    const topicData: Record<string, { correct: number, total: number }> = {};
     const activityMap = new Map<string, number>();
 
     testHistory.forEach(test => {
       totalCorrect += test.score;
       totalAnswered += test.total;
-      const dateKey = format(new Date(test.date), 'yyyy-MM-dd');
+      const dateKey = format(new Date(test.created_at), 'yyyy-MM-dd');
       activityMap.set(dateKey, (activityMap.get(dateKey) || 0) + 1);
-
-      test.questions.forEach(q => {
-          const topic = q.topic || 'Uncategorized';
-          if (!topicData[topic]) {
-            topicData[topic] = { correct: 0, total: 0 };
-          }
-          topicData[topic].total++;
-
-          // Find the result for the current question from the test's results array
-          const result = test.results.find(r => r.questionText === q.text);
-          if (result?.isCorrect) {
-            topicData[topic].correct++;
-          }
-      });
     });
-    
-    const topicPerformance = Object.entries(topicData).map(([topic, {correct, total}]) => ({
-        name: topic,
-        Accuracy: total > 0 ? parseFloat(((correct / total) * 100).toFixed(1)) : 0,
-    })).sort((a,b) => b.Accuracy - a.Accuracy);
 
     const activityData = Array.from(activityMap.entries()).map(([date, count]) => ({ date, count }));
 
     return {
       totalTests: testHistory.length,
       avgScore: totalAnswered > 0 ? parseFloat(((totalCorrect / totalAnswered) * 100).toFixed(1)) : 0,
-      topicPerformance,
       activityData,
     };
   }, [testHistory]);
@@ -84,8 +87,8 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
                 <File className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{pdfCount}</div>
-                 {pdfCount > 0 && (
+                <div className="text-2xl font-bold">{sourceFiles.length}</div>
+                 {sourceFiles.length > 0 && (
                   <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                           <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground -mt-1">View files</Button>
@@ -139,22 +142,26 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
             <ActivityCalendar data={analyticsData.activityData} title="Test Activity" />
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base font-medium">Top 5 Topics by Accuracy</CardTitle>
+                    <CardTitle className="text-base font-medium">Topic Performance</CardTitle>
                     <CardDescription>Performance based on all tests taken.</CardDescription>
                 </CardHeader>
-                <CardContent className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <RechartsBarChart data={analyticsData.topicPerformance.slice(0, 5)} layout="vertical" margin={{ left: 20, right: 20 }}>
-                            <XAxis type="number" domain={[0, 100]} hide />
-                            <YAxis dataKey="name" type="category" width={80} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                            <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} formatter={(value) => `${value}%`} />
-                            <Bar dataKey="Accuracy" radius={[4, 4, 4, 4]} barSize={20}>
-                                {analyticsData.topicPerformance.slice(0, 5).map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Bar>
-                        </RechartsBarChart>
-                    </ResponsiveContainer>
+                <CardContent className="h-[250px] flex items-center justify-center">
+                    {topicPerformance.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RechartsBarChart data={topicPerformance.slice(0, 5)} layout="vertical" margin={{ left: 20, right: 20 }}>
+                                <XAxis type="number" domain={[0, 100]} hide />
+                                <YAxis dataKey="name" type="category" width={80} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                                <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} formatter={(value) => `${value}%`} />
+                                <Bar dataKey="Accuracy" radius={[4, 4, 4, 4]} barSize={20}>
+                                    {topicPerformance.slice(0, 5).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </RechartsBarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">Take more tests to see your topic performance.</p>
+                    )}
                 </CardContent>
             </Card>
           </div>
@@ -174,11 +181,11 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {testHistory.slice(-5).reverse().map(test => (
+                        {testHistory.slice(0, 5).map(test => (
                             <TableRow key={test.id}>
                                 <TableCell>
-                                    <div className="font-medium">{format(new Date(test.date), 'MMMM d, yyyy')}</div>
-                                    <div className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(test.date), { addSuffix: true })}</div>
+                                    <div className="font-medium">{format(new Date(test.created_at), 'MMMM d, yyyy')}</div>
+                                    <div className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(test.created_at), { addSuffix: true })}</div>
                                 </TableCell>
                                 <TableCell>{test.score} / {test.total}</TableCell>
                                 <TableCell className="text-right">

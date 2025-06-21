@@ -38,7 +38,7 @@ function TestResults({
     const performance: Record<string, { correct: number; total: number }> = {};
 
     test.forEach(q => {
-      const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
+      const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correct_option || '');
       
       const topic = q.topic || 'Uncategorized';
       if (!performance[topic]) {
@@ -117,7 +117,7 @@ function TestResults({
                   <p className="font-semibold mb-2">{index + 1}. {q.text}</p>
                   <div className="space-y-2">
                       {q.options?.map((option, i) => {
-                          const isCorrect = normalizeOption(q.correctOption || '') === normalizeOption(option);
+                          const isCorrect = normalizeOption(q.correct_option || '') === normalizeOption(option);
                           const isUserAnswer = normalizeOption(userAnswers[q.id] || '') === normalizeOption(option);
                           return (
                               <div key={i} className={cn("flex items-center gap-3 p-2 rounded-md", isCorrect ? "bg-green-100 dark:bg-green-900/30" : isUserAnswer ? "bg-red-100 dark:bg-red-900/30" : "")}>
@@ -165,7 +165,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
       
       let score = 0;
       generatedTest.forEach(q => {
-          const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
+          const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correct_option || '');
           if (isCorrect) score++;
       });
       
@@ -173,8 +173,8 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
           questionText: q.text,
           topic: q.topic,
           userAnswer: userAnswers[q.id] || "Not Answered",
-          correctAnswer: q.correctOption,
-          isCorrect: normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || ''),
+          correctAnswer: q.correct_option || undefined,
+          isCorrect: normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correct_option || ''),
       }));
       
       let testResult: TestResult = {
@@ -185,23 +185,20 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
         feedback: null, // Initially null
         score,
         total: generatedTest.length,
-        results: resultsForFeedback,
       };
 
       setCompletedTest(testResult);
       setStatus('results');
 
-      // Generate feedback in the background
+      // Generate feedback in the background and save the test
       const feedbackResult = await generateTestFeedbackAction({ results: resultsForFeedback });
       
       if (!('error' in feedbackResult)) {
-        // We need to update the state of the completedTest with the new feedback
-        setCompletedTest(prevResult => prevResult ? {...prevResult, feedback: feedbackResult} : null);
-        // And also call the parent handler to update the global history
-        onTestComplete({...testResult, feedback: feedbackResult});
+        const finalResult = {...testResult, feedback: feedbackResult};
+        setCompletedTest(finalResult);
+        onTestComplete(finalResult);
       } else {
          toast({ variant: 'destructive', title: 'Feedback Error', description: feedbackResult.error });
-         // Still save the test result without feedback
          onTestComplete(testResult);
       }
       
@@ -233,7 +230,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
       return ['All', ...Array.from(topics)];
   }, [questions]);
   
-  const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
+  const sourceFiles = useMemo(() => [...new Set(questions.map(q => q.sourceFile).filter(Boolean))], [questions]);
   
   const testableQuestions = useMemo(() => {
     return questions.filter(q => q.options && q.options.length > 0);
@@ -243,7 +240,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
     const filtered = testableQuestions.filter(q => {
       const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
-      const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile);
+      const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile!);
       return topicMatch && difficultyMatch && sourceFileMatch;
     });
 
@@ -286,9 +283,15 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
             return;
         }
         
-        onQuestionsUpdate(result.solvedQuestions);
+        const updates = result.solvedQuestions.map(sq => ({
+            id: sq.id,
+            solution: sq.solution,
+            correct_option: sq.correctOption,
+            difficulty: sq.difficulty
+        }));
+        onQuestionsUpdate(updates);
         
-        const solvedQuestionsMap = new Map(result.solvedQuestions.map(sq => [sq.id, sq]));
+        const solvedQuestionsMap = new Map(updates.map(sq => [sq.id, sq]));
         const finalTest = test.map(q => {
             const solvedData = solvedQuestionsMap.get(q.id);
             return solvedData ? { ...q, ...solvedData } : q;
@@ -458,10 +461,10 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
                 {sourceFiles.map(file => (
                     <DropdownMenuCheckboxItem
                         key={file}
-                        checked={sourceFileFilter.includes(file)}
+                        checked={sourceFileFilter.includes(file!)}
                         onCheckedChange={checked => {
                             setSourceFileFilter(prev => 
-                                checked ? [...prev, file] : prev.filter(f => f !== file)
+                                checked ? [...prev, file!] : prev.filter(f => f !== file)
                             )
                         }}
                     >

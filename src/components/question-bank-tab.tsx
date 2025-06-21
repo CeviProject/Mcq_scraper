@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Question, SegregatedContent } from '@/lib/types';
+import React, { useState, useMemo } from 'react';
+import { Question, Document, ChatMessage } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ListChecks, Sparkles, File, HelpCircle, Wand2, Loader2, BrainCircuit, Check, X, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
+import { ListChecks, Sparkles, File, HelpCircle, Wand2, Loader2, BrainCircuit, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getSolutionAction, getTricksAction, askFollowUpAction } from '@/app/actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -25,16 +25,28 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 
 interface QuestionBankTabProps {
   questions: Question[];
-  onQuestionUpdate: (question: Question) => void;
-  segregatedContents: SegregatedContent[];
+  onQuestionUpdate: (question: Partial<Question> & {id: string}) => void;
+  documents: Document[];
+  questionUiState: Map<string, { userSelectedOption?: string; chatHistory?: ChatMessage[] }>;
+  setQuestionUiState: React.Dispatch<React.SetStateAction<Map<string, { userSelectedOption?: string; chatHistory?: ChatMessage[] }>>>;
 }
 
 const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard', 'Not Set'];
 
-function QuestionItem({ question, onQuestionUpdate, theory }: { question: Question, onQuestionUpdate: (question: Question) => void, theory?: string }) {
+function QuestionItem({ 
+    question, 
+    onQuestionUpdate, 
+    theory, 
+    uiState,
+    setUiState
+}: { 
+    question: Question, 
+    onQuestionUpdate: (question: Partial<Question> & { id: string }) => void, 
+    theory?: string | null,
+    uiState: { userSelectedOption?: string; chatHistory?: ChatMessage[] },
+    setUiState: (questionId: string, newState: Partial<{ userSelectedOption?: string; chatHistory?: ChatMessage[] }>) => void
+}) {
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  
   const [isSolutionDialogOpen, setIsSolutionDialogOpen] = useState(false);
   const [followUpQuery, setFollowUpQuery] = useState('');
   const [isReplying, setIsReplying] = useState(false);
@@ -42,45 +54,36 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
   const [isGeneratingTricks, setIsGeneratingTricks] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // If a correct option is already present, the question is considered "verified" from the start.
-    if (question.correctOption) {
-      setIsVerified(true);
-    }
-  }, [question.correctOption]);
+  const isVerified = !!question.correct_option;
 
   const handleVerifyAnswer = async () => {
-    if (!question.userSelectedOption) {
+    if (!uiState.userSelectedOption) {
       toast({ variant: 'destructive', title: 'Please select an option first.' });
       return;
     }
     setIsVerifying(true);
     
-    // If we don't have the solution data, fetch it in one API call.
     if (!question.solution) {
       const result = await getSolutionAction({ 
         questionText: question.text,
         options: question.options,
-        theoryContext: theory 
+        theoryContext: theory || undefined 
       });
 
       if ('error' in result) {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
         setIsVerifying(false);
         return;
-      } else {
-        // Update the question in the parent state with all new data.
-        onQuestionUpdate({ 
-          ...question, 
-          solution: result.solution, 
-          correctOption: result.correctOption,
-          difficulty: question.difficulty === 'Not Set' ? result.difficulty : question.difficulty,
-          chatHistory: [] 
-        });
       }
+      onQuestionUpdate({ 
+        id: question.id,
+        solution: result.solution, 
+        correct_option: result.correctOption,
+        difficulty: question.difficulty === 'Not Set' ? result.difficulty : question.difficulty,
+      });
+      setUiState(question.id, { chatHistory: [] });
     }
 
-    setIsVerified(true);
     setIsVerifying(false);
   };
 
@@ -90,26 +93,26 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
     const currentQuery = followUpQuery;
     setFollowUpQuery('');
 
-    const currentHistory = question.chatHistory || [];
+    const currentHistory = uiState.chatHistory || [];
     const newUserMessage = { role: 'user' as const, content: currentQuery };
     
-    onQuestionUpdate({ ...question, chatHistory: [...currentHistory, newUserMessage] });
+    setUiState(question.id, { chatHistory: [...currentHistory, newUserMessage] });
 
     const result = await askFollowUpAction({
         questionText: question.text,
         options: question.options,
-        solution: question.solution,
-        theoryContext: theory,
+        solution: question.solution || "",
+        theoryContext: theory || undefined,
         chatHistory: currentHistory,
         userQuery: currentQuery,
     });
     
     if ('error' in result) {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
-        onQuestionUpdate({ ...question, chatHistory: currentHistory });
+        setUiState(question.id, { chatHistory: currentHistory });
     } else {
         const aiMessage = { role: 'model' as const, content: result.answer };
-        onQuestionUpdate({ ...question, chatHistory: [...currentHistory, newUserMessage, aiMessage] });
+        setUiState(question.id, { chatHistory: [...currentHistory, newUserMessage, aiMessage] });
     }
     setIsReplying(false);
   };
@@ -126,7 +129,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
   };
 
   const handleSelectOption = (option: string) => {
-    onQuestionUpdate({ ...question, userSelectedOption: option });
+    setUiState(question.id, { userSelectedOption: option });
   };
   
   return (
@@ -136,13 +139,13 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
         {question.options && question.options.length > 0 && (
           <RadioGroup 
             className="mb-4 space-y-2" 
-            value={question.userSelectedOption} 
+            value={uiState.userSelectedOption} 
             onValueChange={handleSelectOption}
             disabled={isVerified}
           >
             {question.options.map((option, index) => {
-              const isCorrect = normalizeOption(question.correctOption || '') === normalizeOption(option);
-              const isSelected = question.userSelectedOption === option;
+              const isCorrect = normalizeOption(question.correct_option || '') === normalizeOption(option);
+              const isSelected = uiState.userSelectedOption === option;
               
               return (
                 <div key={index} className="flex items-center space-x-2">
@@ -172,7 +175,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row gap-4 items-center bg-muted/50 p-4 rounded-b-lg">
         <div className="flex-1 w-full flex items-center gap-4">
-            <Select value={question.difficulty} onValueChange={(value) => onQuestionUpdate({...question, difficulty: value as Question['difficulty']})}>
+            <Select value={question.difficulty} onValueChange={(value) => onQuestionUpdate({id: question.id, difficulty: value as Question['difficulty']})}>
               <SelectTrigger id={`difficulty-${question.id}`} className="w-[120px]">
                 <SelectValue placeholder="Set difficulty" />
               </SelectTrigger>
@@ -180,11 +183,11 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
                 {difficultyOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Input value={question.topic} onChange={(e) => onQuestionUpdate({...question, topic: e.target.value})} placeholder="e.g., Percentages" />
+            <Input value={question.topic} onChange={(e) => onQuestionUpdate({id: question.id, topic: e.target.value})} placeholder="e.g., Percentages" />
         </div>
         <div className="flex items-end gap-2 w-full sm:w-auto mt-4 sm:mt-0">
             {!isVerified ? (
-              <Button onClick={handleVerifyAnswer} disabled={isVerifying || !question.userSelectedOption} className="w-full sm:w-auto">
+              <Button onClick={handleVerifyAnswer} disabled={isVerifying || !uiState.userSelectedOption} className="w-full sm:w-auto">
                 {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Verify Answer
               </Button>
@@ -209,14 +212,14 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
                               <div className="flex justify-between items-center mb-2">
                                   <h4 className="font-semibold">Solution</h4>
                               </div>
-                               <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{question.solution}</ReactMarkdown>
+                               <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{question.solution || ''}</ReactMarkdown>
                           </div>
                           
                           <Separator />
                           <div className="space-y-4">
                               <h4 className="font-semibold">Ask a Follow-up</h4>
                               <div className="space-y-4">
-                                  {question.chatHistory?.map((msg, index) => (
+                                  {uiState.chatHistory?.map((msg, index) => (
                                       <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                                           {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0"><BrainCircuit className="w-5 h-5 text-primary" /></div>}
                                           <div className={`rounded-lg p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
@@ -295,7 +298,7 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
 }
 
 
-export default function QuestionBankTab({ questions, onQuestionUpdate, segregatedContents }: QuestionBankTabProps) {
+export default function QuestionBankTab({ questions, onQuestionUpdate, documents, questionUiState, setQuestionUiState }: QuestionBankTabProps) {
   const [topicFilter, setTopicFilter] = useState('All');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [sourceFileFilter, setSourceFileFilter] = useState<string[]>([]);
@@ -304,16 +307,22 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
   const availableTopics = useMemo(() => ['All', ...Array.from(new Set(questions.map(q => q.topic).filter(t => t && t !== 'Uncategorized')))], [questions]);
 
   const filteredQuestions = useMemo(() => {
-    const filtered = questions.filter(q => {
+    return questions.filter(q => {
       const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
-      const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile);
+      const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile!);
       return topicMatch && difficultyMatch && sourceFileMatch;
-    });
-
-    return filtered.sort((a, b) => a.topic.localeCompare(b.topic));
-
+    }).sort((a, b) => a.topic.localeCompare(b.topic));
   }, [questions, topicFilter, difficultyFilter, sourceFileFilter]);
+
+  const handleSetUiState = (questionId: string, newState: Partial<{ userSelectedOption?: string; chatHistory?: ChatMessage[] }>) => {
+    setQuestionUiState(prev => {
+        const newMap = new Map(prev);
+        const currentState = newMap.get(questionId) || {};
+        newMap.set(questionId, { ...currentState, ...newState });
+        return newMap;
+    });
+  };
 
   if (questions.length === 0) {
     return (
@@ -323,7 +332,7 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
                     <ListChecks className="h-12 w-12 text-muted-foreground" />
                 </div>
                 <CardTitle className="mt-4">Your Question Bank is Empty</CardTitle>
-                <CardDescription>Upload PDFs on the dashboard. Questions will appear here.</CardDescription>
+                <CardDescription>Upload PDFs on the Upload tab. Questions will appear here.</CardDescription>
             </CardHeader>
         </Card>
     );
@@ -372,10 +381,10 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
                 {sourceFiles.map(file => (
                     <DropdownMenuCheckboxItem
                         key={file}
-                        checked={sourceFileFilter.includes(file)}
+                        checked={sourceFileFilter.includes(file!)}
                         onCheckedChange={checked => {
                             setSourceFileFilter(prev => 
-                                checked ? [...prev, file] : prev.filter(f => f !== file)
+                                checked ? [...prev, file!] : prev.filter(f => f !== file)
                             )
                         }}
                     >
@@ -393,8 +402,9 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
           {filteredQuestions.length} Question{filteredQuestions.length === 1 ? '' : 's'} Found
         </h3>
         {filteredQuestions.map(q => {
-          const theory = segregatedContents.find(c => c.sourceFile === q.sourceFile)?.theory;
-          return <QuestionItem key={q.id} question={q} onQuestionUpdate={onQuestionUpdate} theory={theory} />
+          const theory = documents.find(c => c.id === q.document_id)?.theory;
+          const uiState = questionUiState.get(q.id) || {};
+          return <QuestionItem key={q.id} question={q} onQuestionUpdate={onQuestionUpdate} theory={theory} uiState={uiState} setUiState={handleSetUiState} />
         })}
       </div>
     </div>

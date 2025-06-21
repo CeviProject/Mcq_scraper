@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload } from 'lucide-react';
-import { SegregatedContent, Question, TestResult } from '@/lib/types';
-import { segregateContentAction } from '@/app/actions';
+import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2 } from 'lucide-react';
+import { Document, Question, TestResult, ChatMessage, Test } from '@/lib/types';
+import { segregateContentAction, batchSolveQuestionsAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -14,177 +14,234 @@ import QuestionBankTab from './question-bank-tab';
 import TestGeneratorTab from './test-generator-tab';
 import SettingsSheet from './settings-sheet';
 import { Skeleton } from './ui/skeleton';
+import { createClient } from '@/lib/supabase';
+import type { Session } from '@supabase/supabase-js';
 
-export default function AptitudeAceClient() {
-  const [segregatedContents, setSegregatedContents] = useState<SegregatedContent[]>([]);
+export default function AptitudeAceClient({ session, profile }: { session: Session | null, profile: { username: string } | null }) {
+  const supabase = createClient();
+
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [testHistory, setTestHistory] = useState<Test[]>([]);
+  
+  const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState<[number, number] | null>(null);
-  const [testHistory, setTestHistory] = useState<TestResult[]>([]);
   
-  const [username, setUsername] = useState('');
+  // Transient UI state that doesn't belong in the database
+  const [questionUiState, setQuestionUiState] = useState<Map<string, { userSelectedOption?: string; chatHistory?: ChatMessage[] }>>(new Map());
+
+  const [username, setUsername] = useState('Guest');
   const [theme, setTheme] = useState('dark');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
 
+  // Initial data fetch and subscription setup
   useEffect(() => {
-    setIsClient(true);
-    // Theme logic
+    const fetchData = async () => {
+      if (!session) {
+        setIsLoading(false);
+        return;
+      };
+
+      setIsLoading(true);
+      
+      const [docsRes, questionsRes, testsRes] = await Promise.all([
+        supabase.from('documents').select('*').order('created_at', { ascending: false }),
+        supabase.from('questions').select('*, documents(source_file)').order('created_at', { ascending: false }),
+        supabase.from('tests').select('*').order('created_at', { ascending: false })
+      ]);
+      
+      if (docsRes.error || testsRes.error || questionsRes.error) {
+        toast({ variant: 'destructive', title: 'Error fetching data', description: docsRes.error?.message || testsRes.error?.message || questionsRes.error?.message });
+      } else {
+        setDocuments(docsRes.data || []);
+        
+        const questionsWithSourceFile = questionsRes.data?.map(q => ({
+          ...q,
+          // @ts-ignore
+          sourceFile: q.documents.source_file
+        })) || [];
+        // @ts-ignore
+        setQuestions(questionsWithSourceFile);
+        
+        setTestHistory(testsRes.data || []);
+      }
+      setIsLoading(false);
+    };
+
+    fetchData();
+
+  }, [session, supabase, toast]);
+  
+  useEffect(() => {
+    // Theme logic from localStorage
     const storedTheme = localStorage.getItem('aptitude-ace-theme') || 'dark';
     setTheme(storedTheme);
-
-    // Username logic
-    const storedUsername = localStorage.getItem('aptitude-ace-username') || 'Guest';
-    setUsername(storedUsername);
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(storedTheme);
   }, []);
 
   useEffect(() => {
-    if (isClient) {
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
-      root.classList.add(theme);
-      localStorage.setItem('aptitude-ace-theme', theme);
+    // Set username from profile passed from server
+    if (profile?.username) {
+      setUsername(profile.username);
     }
-  }, [theme, isClient]);
-  
-  const handleUsernameChange = (newName: string) => {
-    const finalUsername = newName.trim() === '' ? 'Guest' : newName.trim();
-    setUsername(finalUsername);
-    localStorage.setItem('aptitude-ace-username', finalUsername);
+  }, [profile]);
+
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+      setTheme(newTheme);
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(newTheme);
+      localStorage.setItem('aptitude-ace-theme', newTheme);
   };
-
-
+  
   const { toast } = useToast();
 
-  const handleTestComplete = useCallback((result: TestResult) => {
-    setTestHistory(prev => [...prev, result]);
+  const handleTestComplete = useCallback(async (result: TestResult) => {
+    if (!session) return;
+    
+    // 1. Insert into 'tests' table
+    const { data: testData, error: testError } = await supabase
+      .from('tests')
+      .insert({
+        user_id: session.user.id,
+        score: result.score,
+        total: result.total,
+        feedback: result.feedback,
+      })
+      .select()
+      .single();
+
+    if (testError || !testData) {
+      toast({ variant: 'destructive', title: 'Error saving test result', description: testError?.message });
+      return;
+    }
+    
+    // 2. Prepare and insert into 'test_attempts'
+    const attempts = result.questions.map(q => {
+      const isCorrect = normalizeOption(result.userAnswers[q.id] || '') === normalizeOption(q.correct_option || '');
+      return {
+        test_id: testData.id,
+        question_id: q.id,
+        user_answer: result.userAnswers[q.id] || null,
+        is_correct: isCorrect,
+      };
+    });
+
+    const { error: attemptsError } = await supabase.from('test_attempts').insert(attempts);
+    if(attemptsError) {
+       toast({ variant: 'destructive', title: 'Error saving test attempts', description: attemptsError?.message });
+       // Note: might want to delete the parent 'test' record here for consistency
+    }
+
+    setTestHistory(prev => [testData, ...prev]);
+
     toast({
         title: "Test Saved",
         description: "Your test results have been saved to your dashboard.",
     });
-  }, [toast]);
+  }, [session, supabase, toast]);
 
   const handleUpload = useCallback(async (files: File[]) => {
+    if (!session) {
+        toast({ variant: "destructive", title: "You must be logged in to upload files." });
+        return;
+    }
     setIsProcessing(true);
     setProcessingProgress([0, files.length]);
-    const newContents: SegregatedContent[] = [];
     let processedCount = 0;
 
-    try {
-      for (const file of files) {
-        const reader = new FileReader();
-        const promise = new Promise<SegregatedContent | null>((resolve, reject) => {
-          reader.onload = async () => {
-            try {
-              const pdfDataUri = reader.result as string;
-              const result = await segregateContentAction({ pdfDataUri });
-
-              if ('error' in result) {
-                toast({
-                  variant: "destructive",
-                  title: `Error processing ${file.name}`,
-                  description: result.error,
-                });
-                // Resolve with null to not break the loop for other files
-                resolve(null); 
-                return;
-              }
-              
-              const questions = result.questions
-                .filter(q => q.questionText && q.questionText.length > 5)
-                .map((q): Question => ({
-                  id: crypto.randomUUID(),
-                  text: q.questionText,
-                  options: q.options,
-                  topic: q.topic || 'Uncategorized',
-                  difficulty: 'Not Set',
-                  solution: '',
-                  chatHistory: [],
-                  sourceFile: file.name,
-                }));
-
-              resolve({
-                theory: result.theory,
-                questions: questions,
-                sourceFile: file.name,
-              });
-            } catch (e) {
-              reject(e);
-            }
-          };
-          reader.onerror = (error) => reject(error);
-          reader.readAsDataURL(file);
+    for (const file of files) {
+      try {
+        const pdfDataUri = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
         });
 
-        const content = await promise;
-        if (content) {
-            newContents.push(content);
+        const segResult = await segregateContentAction({ pdfDataUri });
+
+        if ('error' in segResult) {
+          toast({ variant: "destructive", title: `Error processing ${file.name}`, description: segResult.error });
+          continue; // Skip to next file
         }
+        
+        // Save document to DB
+        const { data: docData, error: docError } = await supabase
+            .from('documents')
+            .insert({ user_id: session.user.id, source_file: file.name, theory: segResult.theory })
+            .select('id, source_file, theory')
+            .single();
+        
+        if (docError) throw new Error(`Failed to save document: ${docError.message}`);
+        
+        // Save questions to DB
+        const questionsToInsert = segResult.questions
+          .filter(q => q.questionText && q.questionText.length > 5)
+          .map(q => ({
+            document_id: docData.id,
+            user_id: session.user.id,
+            text: q.questionText,
+            options: q.options,
+            topic: q.topic || 'Uncategorized',
+          }));
+
+        if (questionsToInsert.length > 0) {
+            const { data: newQuestionsData, error: qError } = await supabase.from('questions').insert(questionsToInsert).select();
+            if (qError) throw new Error(`Failed to save questions: ${qError.message}`);
+             // @ts-ignore
+            setQuestions(prev => [...newQuestionsData.map(q => ({...q, sourceFile: docData.source_file})), ...prev]);
+        }
+        
+        // @ts-ignore
+        setDocuments(prev => [{...docData, questions: []}, ...prev]);
+
+      } catch (error: any) {
+        toast({ variant: "destructive", title: `Error processing ${file.name}`, description: error.message });
+      } finally {
         processedCount++;
         setProcessingProgress([processedCount, files.length]);
       }
-
-      setSegregatedContents(prev => [...prev, ...newContents]);
-      
-      if (newContents.length > 0) {
-        toast({
-            title: "Processing Complete",
-            description: `${newContents.length} of ${files.length} PDF(s) processed and added.`,
-        });
-      }
-
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: "destructive",
-        title: "An unexpected error occurred",
-        description: "Something went wrong during PDF processing.",
-      });
-    } finally {
-      setIsProcessing(false);
-      setProcessingProgress(null);
     }
-  }, [toast]);
 
-  const allQuestions = useMemo(() => {
-    return segregatedContents.flatMap(content => content.questions);
-  }, [segregatedContents]);
+    setIsProcessing(false);
+    setProcessingProgress(null);
+  }, [session, supabase, toast]);
 
-  const sourceFiles = useMemo(() => segregatedContents.map(c => c.sourceFile), [segregatedContents]);
+  const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
+    const { id, ...updateData } = updatedQuestion;
+    const { error } = await supabase.from('questions').update(updateData).eq('id', id);
 
-  const handleQuestionUpdate = useCallback((updatedQuestion: Question) => {
-    setSegregatedContents(prevContents => {
-      const newContents = prevContents.map(content => {
-        const questionIndex = content.questions.findIndex(q => q.id === updatedQuestion.id);
-        if (questionIndex > -1) {
-          const newQuestions = [...content.questions];
-          newQuestions[questionIndex] = updatedQuestion;
-          return { ...content, questions: newQuestions };
-        }
-        return content;
-      });
-      return newContents;
-    });
-  }, []);
+    if (error) {
+        toast({ variant: 'destructive', title: 'Error updating question', description: error.message });
+    } else {
+        setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...updateData } : q));
+    }
+  }, [supabase, toast]);
   
-  const handleQuestionsUpdate = useCallback((updates: (Partial<Question> & { id: string })[]) => {
-    const updatesMap = new Map(updates.map(u => [u.id, u]));
+  const handleQuestionsUpdate = useCallback(async (updates: (Partial<Question> & { id: string })[]) => {
+    const { error } = await supabase.from('questions').upsert(updates);
     
-    setSegregatedContents(prevContents => {
-      return prevContents.map(content => {
-        let contentHasChanged = false;
-        const newQuestions = content.questions.map(q => {
-          if (updatesMap.has(q.id)) {
-            contentHasChanged = true;
-            return { ...q, ...updatesMap.get(q.id)! };
-          }
-          return q;
-        });
+    if (error) {
+        toast({ variant: 'destructive', title: 'Error batch updating questions', description: error.message });
+    } else {
+        const updatesMap = new Map(updates.map(u => [u.id, u]));
+        setQuestions(prev => prev.map(q => updatesMap.has(q.id) ? { ...q, ...updatesMap.get(q.id)! } : q));
+    }
+  }, [supabase, toast]);
 
-        return contentHasChanged ? { ...content, questions: newQuestions } : content;
-      });
-    });
-  }, []);
-
+  const handleUsernameChange = (newName: string) => {
+    setUsername(newName);
+  };
+  
+  if (isLoading) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -194,11 +251,7 @@ export default function AptitudeAceClient() {
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Aptitude Ace</h1>
           </div>
           <div className="ml-auto flex items-center gap-4">
-            {isClient ? (
-                <span className="text-sm text-muted-foreground hidden md:block">Welcome, {username}</span>
-            ) : (
-                <Skeleton className="h-5 w-24 hidden md:block" />
-            )}
+            <span className="text-sm text-muted-foreground hidden md:block">Welcome, {username}</span>
             <Button variant="outline" size="icon" onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4" />
               <span className="sr-only">Settings</span>
@@ -210,15 +263,15 @@ export default function AptitudeAceClient() {
           <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
             <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</TabsTrigger>
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Upload</TabsTrigger>
-            <TabsTrigger value="theory" className="gap-2" disabled={segregatedContents.length === 0}><BookOpen className="h-4 w-4" />Theory Zone</TabsTrigger>
-            <TabsTrigger value="questions" className="gap-2" disabled={allQuestions.length === 0}><ListChecks className="h-4 w-4" />Question Bank</TabsTrigger>
-            <TabsTrigger value="test-generator" className="gap-2" disabled={allQuestions.length === 0}><FileText className="h-4 w-4" />Test Generator</TabsTrigger>
+            <TabsTrigger value="theory" className="gap-2" disabled={documents.length === 0}><BookOpen className="h-4 w-4" />Theory Zone</TabsTrigger>
+            <TabsTrigger value="questions" className="gap-2" disabled={questions.length === 0}><ListChecks className="h-4 w-4" />Question Bank</TabsTrigger>
+            <TabsTrigger value="test-generator" className="gap-2" disabled={questions.length === 0}><FileText className="h-4 w-4" />Test Generator</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-6">
             <DashboardTab 
-              sourceFiles={sourceFiles}
-              questionCount={allQuestions.length} 
+              sourceFiles={documents.map(d => d.source_file)}
+              questionCount={questions.length} 
               testHistory={testHistory}
             />
           </TabsContent>
@@ -230,14 +283,20 @@ export default function AptitudeAceClient() {
             />
           </TabsContent>
           <TabsContent value="theory" className="mt-6">
-            <TheoryZoneTab contents={segregatedContents} />
+            <TheoryZoneTab documents={documents} />
           </TabsContent>
           <TabsContent value="questions" className="mt-6">
-            <QuestionBankTab questions={allQuestions} onQuestionUpdate={handleQuestionUpdate} segregatedContents={segregatedContents} />
+            <QuestionBankTab 
+                questions={questions} 
+                onQuestionUpdate={handleQuestionUpdate} 
+                documents={documents}
+                questionUiState={questionUiState}
+                setQuestionUiState={setQuestionUiState}
+            />
           </TabsContent>
           <TabsContent value="test-generator" className="mt-6">
             <TestGeneratorTab 
-              questions={allQuestions} 
+              questions={questions} 
               onTestComplete={handleTestComplete} 
               onQuestionsUpdate={handleQuestionsUpdate}
             />
@@ -248,10 +307,16 @@ export default function AptitudeAceClient() {
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         theme={theme}
-        setTheme={setTheme}
+        setTheme={handleThemeChange}
         username={username}
         setUsername={handleUsernameChange}
+        supabase={supabase}
       />
     </div>
   );
+}
+
+function normalizeOption(str: string): string {
+  if (!str) return "";
+  return str.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
