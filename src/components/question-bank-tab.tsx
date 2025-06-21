@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ListChecks, Sparkles, File, BookCopy, Wand2, Loader2, BrainCircuit } from 'lucide-react';
+import { ListChecks, Sparkles, File, BookCopy, Wand2, Loader2, BrainCircuit, Check, X } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getSolutionAction, getTricksAction, askFollowUpAction } from '@/app/actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
 
 interface QuestionBankTabProps {
   questions: Question[];
@@ -50,7 +51,13 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
     if ('error' in result) {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     } else {
-      onQuestionUpdate({ ...question, solution: result.solution, chatHistory: [] });
+      onQuestionUpdate({ 
+        ...question, 
+        solution: result.solution, 
+        correctOption: result.correctOption,
+        difficulty: question.difficulty === 'Not Set' ? result.difficulty : question.difficulty,
+        chatHistory: [] 
+      });
     }
     setIsGeneratingSolution(false);
   };
@@ -96,22 +103,50 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
     setIsGeneratingTricks(false);
   };
 
+  const handleSelectOption = (option: string) => {
+    onQuestionUpdate({ ...question, userSelectedOption: option });
+  };
+
+  const answerVerified = question.correctOption && question.userSelectedOption;
+
   return (
     <Card>
       <CardContent className="p-6">
         <p className="text-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
         {question.options && question.options.length > 0 && (
-          <RadioGroup className="mb-4 space-y-2">
-            {question.options.map((option, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <RadioGroupItem value={option} id={`${question.id}-option-${index}`} />
-                <Label htmlFor={`${question.id}-option-${index}`}>{option}</Label>
-              </div>
-            ))}
+          <RadioGroup 
+            className="mb-4 space-y-2" 
+            value={question.userSelectedOption} 
+            onValueChange={handleSelectOption}
+            disabled={!!answerVerified}
+          >
+            {question.options.map((option, index) => {
+              const isCorrect = question.correctOption === option;
+              const isSelected = question.userSelectedOption === option;
+              
+              return (
+                <div key={index} className="flex items-center space-x-2">
+                  <RadioGroupItem value={option} id={`${question.id}-option-${index}`} />
+                  <Label 
+                    htmlFor={`${question.id}-option-${index}`}
+                    className={cn(
+                      "cursor-pointer",
+                      answerVerified && isCorrect && "text-green-700 font-bold",
+                      answerVerified && isSelected && !isCorrect && "text-red-700 font-bold line-through"
+                    )}
+                  >
+                    {option}
+                    {answerVerified && isCorrect && <Check className="inline w-4 h-4 ml-2 text-green-700" />}
+                    {answerVerified && isSelected && !isCorrect && <X className="inline w-4 h-4 ml-2 text-red-700" />}
+                  </Label>
+                </div>
+              );
+            })}
           </RadioGroup>
         )}
         <div className="flex flex-wrap gap-2 mb-4">
           <Badge variant="secondary"><File className="w-3 h-3 mr-1"/>{question.sourceFile}</Badge>
+          <Badge variant="outline">Topic: {question.topic}</Badge>
           <Badge variant={question.isUnique ? "default" : "outline"}><Sparkles className="w-3 h-3 mr-1"/>{question.isUnique ? 'Unique' : 'Common'}</Badge>
           <Badge variant="outline">{question.difficulty}</Badge>
         </div>
@@ -161,16 +196,21 @@ function QuestionItem({ question, onQuestionUpdate, theory }: { question: Questi
                         </div>
                         <Separator />
                         <div>
-                            <h4 className="font-semibold mb-2">Solution</h4>
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-semibold">Solution</h4>
+                                {!hasGeneratedSolution && (
+                                    <Button onClick={handleGenerateSolution} size="sm" disabled={isGeneratingSolution}>
+                                        {isGeneratingSolution ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
+                                        Generate Solution
+                                    </Button>
+                                )}
+                            </div>
                             {isGeneratingSolution ? (
                                 <div className="flex items-center space-x-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /><span>Generating...</span></div>
                             ) : hasGeneratedSolution ? (
                                 <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm]}>{question.solution}</ReactMarkdown>
                             ) : (
-                                <div className="space-y-2">
-                                  <p className="text-sm text-muted-foreground">Click below to generate an AI-powered solution.</p>
-                                  <Button onClick={handleGenerateSolution}><Wand2 className="w-4 h-4 mr-2" />Generate Solution</Button>
-                                </div>
+                                  <p className="text-sm text-muted-foreground">Click the button to generate an AI-powered solution.</p>
                             )}
                         </div>
                         
@@ -266,15 +306,19 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
   const [sourceFileFilter, setSourceFileFilter] = useState('All');
 
   const sourceFiles = useMemo(() => ['All', ...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
+  const availableTopics = useMemo(() => ['All', ...Array.from(new Set(questions.map(q => q.topic).filter(t => t && t !== 'Uncategorized')))], [questions]);
 
   const filteredQuestions = useMemo(() => {
-    return questions.filter(q => {
-      const topicMatch = topicFilter ? q.topic.toLowerCase().includes(topicFilter.toLowerCase()) : true;
+    const filtered = questions.filter(q => {
+      const topicMatch = topicFilter && topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
       const uniquenessMatch = uniquenessFilter !== 'All' ? (uniquenessFilter === 'Unique' ? q.isUnique : !q.isUnique) : true;
       const sourceFileMatch = sourceFileFilter !== 'All' ? q.sourceFile === sourceFileFilter : true;
       return topicMatch && difficultyMatch && uniquenessMatch && sourceFileMatch;
     });
+
+    return filtered.sort((a, b) => a.topic.localeCompare(b.topic));
+
   }, [questions, topicFilter, difficultyFilter, uniquenessFilter, sourceFileFilter]);
 
   if (questions.length === 0) {
@@ -301,7 +345,13 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, segregate
         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-2">
             <Label htmlFor="topic-filter">Topic</Label>
-            <Input id="topic-filter" placeholder="Filter by topic..." value={topicFilter} onChange={e => setTopicFilter(e.target.value)} />
+             <Select value={topicFilter} onValueChange={setTopicFilter}>
+              <SelectTrigger id="topic-filter"><SelectValue placeholder="Filter by topic..."/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Topics</SelectItem>
+                {availableTopics.slice(1).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="difficulty-filter">Difficulty</Label>

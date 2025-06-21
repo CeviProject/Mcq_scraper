@@ -23,6 +23,7 @@ export type ContentSegregationInput = z.infer<typeof ContentSegregationInputSche
 const SegregatedQuestionSchema = z.object({
   questionText: z.string().describe("The full, complete text of the question, without the question number."),
   options: z.array(z.string()).optional().describe("An array of multiple-choice options for the question. For example, ['(A) 10', '(B) 20', '(C) 30', '(D) 40']. Extract the full option text including the letter/number."),
+  topic: z.string().describe("A concise topic for the question (e.g., 'Percentages', 'Time and Work', 'Geometry').")
 });
 
 
@@ -52,6 +53,7 @@ Your goal is to be exhaustive. **Assume everything in the document is either the
 2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. For each question:
     - Extract the full question text. Do not include the question number (e.g., "1.", "Q2.").
     - If the question has multiple-choice options, extract them into an array of strings. Include the option label (e.g., "(A)", "1)") as part of the string.
+    - Based on the question's content, determine its specific topic (e.g., 'Percentages', 'Time and Work', 'Geometry').
     - If there are no options, do not include the 'options' field.
 
 Return the extracted theory and the array of questions in the specified structured format.

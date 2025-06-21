@@ -20,6 +20,8 @@ export type GetSolutionInput = z.infer<typeof GetSolutionInputSchema>;
 
 const GetSolutionOutputSchema = z.object({
     solution: z.string().describe("A detailed, step-by-step solution to the question, formatted in Markdown."),
+    correctOption: z.string().optional().describe("The full text of the correct multiple-choice option, if applicable. Must be one of the provided options."),
+    difficulty: z.enum(['Easy', 'Medium', 'Hard']).describe("The estimated difficulty of the question based on its complexity.")
 });
 export type GetSolutionOutput = z.infer<typeof GetSolutionOutputSchema>;
 
@@ -46,6 +48,7 @@ Provide a clear, step-by-step solution to the following question using your expe
 
 Explain the logic and calculations involved.
 Format the entire response in Markdown.
+Based on the complexity of the question, set the 'difficulty' field to 'Easy', 'Medium', or 'Hard'.
 
 Question:
 {{{questionText}}}
@@ -56,7 +59,7 @@ Available Options:
 - {{{this}}}
 {{/each}}
 
-After providing the step-by-step solution, you MUST conclude by stating which option is the correct answer based on your derivation. For example: "Therefore, the correct option is (B) 20."
+After providing the step-by-step solution, you MUST identify the correct option from the list above and place its full text into the 'correctOption' field.
 {{/if}}
     `,
 });

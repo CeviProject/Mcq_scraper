@@ -44,7 +44,7 @@ export default function AptitudeAceClient() {
                   id: crypto.randomUUID(),
                   text: q.questionText,
                   options: q.options,
-                  topic: 'Uncategorized',
+                  topic: q.topic || 'Uncategorized',
                   difficulty: 'Not Set',
                   isUnique: false,
                   solution: 'No solution added yet.',

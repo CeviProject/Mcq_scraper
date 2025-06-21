@@ -13,6 +13,8 @@ export type Question = {
   solution: string;
   chatHistory?: ChatMessage[];
   sourceFile: string;
+  correctOption?: string;
+  userSelectedOption?: string;
 };
 
 export type SegregatedContent = {
