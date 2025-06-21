@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Question } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown } from 'lucide-react';
+import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { generateTestFeedbackAction } from '@/app/actions';
@@ -152,6 +152,7 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [sourceFileFilter, setSourceFileFilter] = useState<string[]>([]);
   const [numQuestions, setNumQuestions] = useState(10);
+  const [timePerQuestion, setTimePerQuestion] = useState(60); // In seconds
   
   const [status, setStatus] = useState<TestStatus>('configuring');
   const [generatedTest, setGeneratedTest] = useState<Question[]>([]);
@@ -159,8 +160,51 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [feedback, setFeedback] = useState<GenerateTestFeedbackOutput | null>(null);
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   const { toast } = useToast();
+
+  const handleFinishTest = useCallback(async () => {
+      setStatus('results');
+      setIsLoadingFeedback(true);
+      
+      const resultsForAI = generatedTest.map(q => ({
+          questionText: q.text,
+          topic: q.topic,
+          userAnswer: userAnswers[q.id] || "Not Answered",
+          correctAnswer: q.correctOption,
+          isCorrect: normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || ''),
+      }));
+
+      const feedbackResult = await generateTestFeedbackAction({ results: resultsForAI });
+      if ('error' in feedbackResult) {
+          toast({ variant: 'destructive', title: 'Feedback Error', description: feedbackResult.error });
+      } else {
+          setFeedback(feedbackResult);
+      }
+      setIsLoadingFeedback(false);
+
+  }, [generatedTest, userAnswers, toast]);
+
+  useEffect(() => {
+    if (status !== 'in-progress') return;
+
+    if (timeLeft <= 0) {
+      toast({
+        title: "Time's Up!",
+        description: "Your test has been automatically submitted.",
+      });
+      handleFinishTest();
+      return;
+    }
+
+    const timerId = setTimeout(() => {
+      setTimeLeft(t => t - 1);
+    }, 1000);
+
+    return () => clearTimeout(timerId);
+  }, [status, timeLeft, handleFinishTest, toast]);
+  
 
   const availableTopics = useMemo(() => {
       const topics = new Set(questions.map(q => q.topic).filter(t => t && t !== 'Uncategorized'));
@@ -189,7 +233,9 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
     }
 
     const shuffled = filtered.sort(() => 0.5 - Math.random());
-    setGeneratedTest(shuffled.slice(0, numQuestions));
+    const test = shuffled.slice(0, numQuestions);
+    setGeneratedTest(test);
+    setTimeLeft(test.length * timePerQuestion);
     setStatus('in-progress');
     setCurrentQuestionIndex(0);
     setUserAnswers({});
@@ -200,28 +246,6 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
       setUserAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
 
-  const handleFinishTest = useCallback(async () => {
-      setStatus('results');
-      setIsLoadingFeedback(true);
-      
-      const resultsForAI = generatedTest.map(q => ({
-          questionText: q.text,
-          topic: q.topic,
-          userAnswer: userAnswers[q.id] || "Not Answered",
-          correctAnswer: q.correctOption,
-          isCorrect: normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || ''),
-      }));
-
-      const feedbackResult = await generateTestFeedbackAction({ results: resultsForAI });
-      if ('error' in feedbackResult) {
-          toast({ variant: 'destructive', title: 'Feedback Error', description: feedbackResult.error });
-      } else {
-          setFeedback(feedbackResult);
-      }
-      setIsLoadingFeedback(false);
-
-  }, [generatedTest, userAnswers, toast]);
-  
   const handleRestart = () => {
     setStatus('configuring');
     setGeneratedTest([]);
@@ -246,9 +270,17 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Mock Test in Progress</CardTitle>
-                <CardDescription>Question {currentQuestionIndex + 1} of {generatedTest.length}</CardDescription>
-                <Progress value={progress} className="w-full mt-2" />
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Mock Test in Progress</CardTitle>
+                        <CardDescription>Question {currentQuestionIndex + 1} of {generatedTest.length}</CardDescription>
+                    </div>
+                     <div className="flex items-center gap-2 text-lg font-mono text-right text-primary">
+                        <Clock className="h-5 w-5" />
+                        <span>{`${Math.floor(timeLeft / 60).toString().padStart(2, '0')}:${(timeLeft % 60).toString().padStart(2, '0')}`}</span>
+                    </div>
+                </div>
+                <Progress value={progress} className="w-full mt-4" />
             </CardHeader>
             <CardContent className="space-y-6">
                 <p className="text-lg font-semibold">{currentQuestion.text}</p>
@@ -283,12 +315,12 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
     <Card>
       <CardHeader>
         <CardTitle>Create a Mock Test</CardTitle>
-        <CardDescription>Set your criteria and generate a custom practice test. Only questions with generated solutions are available.</CardDescription>
+        <CardDescription>Set your criteria and generate a custom practice test.</CardDescription>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         <div className="space-y-2 col-span-full">
-            <Label>Available for test:</Label>
-            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{questionsWithSolutions.length}</span> questions have solutions and can be used in tests.</p>
+            <Label>Available Questions for Test</Label>
+            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{questionsWithSolutions.length}</span> questions are available. Tests can only include multiple-choice questions for which a solution has already been generated.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="test-topic">Topic</Label>
@@ -321,7 +353,19 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
           />
         </div>
         <div className="space-y-2">
-            <Label htmlFor="source-filter">Source PDF</Label>
+            <Label htmlFor="test-time">Time per Question</Label>
+            <Select value={String(timePerQuestion)} onValueChange={(v) => setTimePerQuestion(Number(v))}>
+              <SelectTrigger id="test-time"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                  <SelectItem value="30">30 seconds</SelectItem>
+                  <SelectItem value="60">1 minute</SelectItem>
+                  <SelectItem value="120">2 minutes</SelectItem>
+                  <SelectItem value="300">5 minutes</SelectItem>
+              </SelectContent>
+            </Select>
+        </div>
+        <div className="space-y-2 col-span-full">
+            <Label htmlFor="source-filter">Source PDF(s)</Label>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="w-full justify-between">
@@ -347,7 +391,7 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+        </div>
       </CardContent>
       <CardFooter>
         <Button onClick={handleGenerateTest} className="w-full" disabled={questionsWithSolutions.length === 0}>
