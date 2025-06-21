@@ -26,15 +26,25 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
+          try {
+            response.cookies.set({ name, value, ...options });
+          } catch (error) {
+            // This is a temporary workaround for a known bug in Next.js.
+          }
         },
         remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
+          try {
+            response.cookies.set({ name, value: '', ...options });
+          } catch (error) {
+            // This is a temporary workaround for a known bug in Next.js.
+          }
         },
       },
     }
   );
 
+  // Refresh session if expired - required for Server Components
+  // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware
   const {
     data: { user },
   } = await supabase.auth.getUser();

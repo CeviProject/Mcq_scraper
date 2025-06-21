@@ -201,7 +201,7 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
         </div>
       ) : (
          <div className="relative w-full h-64 md:h-80 rounded-lg overflow-hidden shadow-lg border">
-             <Image src="https://placehold.co/1200x400.png" alt="Student studying" layout="fill" objectFit="cover" data-ai-hint="learning study" />
+             <Image src="https://placehold.co/1200x400.png" alt="Student studying" fill priority className="object-cover" data-ai-hint="learning study" />
              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <div className="text-center text-white p-4">
                     <h2 className="text-3xl font-bold font-headline">Unlock Your Potential</h2>
