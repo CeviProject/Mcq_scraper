@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings } from 'lucide-react';
-import { SegregatedContent, Question } from '@/lib/types';
+import { SegregatedContent, Question, TestResult } from '@/lib/types';
 import { segregateContentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,7 +15,16 @@ import TestGeneratorTab from './test-generator-tab';
 export default function AptitudeAceClient() {
   const [segregatedContents, setSegregatedContents] = useState<SegregatedContent[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [testHistory, setTestHistory] = useState<TestResult[]>([]);
   const { toast } = useToast();
+
+  const handleTestComplete = useCallback((result: TestResult) => {
+    setTestHistory(prev => [...prev, result]);
+    toast({
+        title: "Test Saved",
+        description: "Your test results have been saved to your dashboard.",
+    });
+  }, [toast]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     setIsProcessing(true);
@@ -129,7 +138,13 @@ export default function AptitudeAceClient() {
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-6">
-            <DashboardTab onUpload={handleUpload} isProcessing={isProcessing} pdfCount={segregatedContents.length} questionCount={allQuestions.length} />
+            <DashboardTab 
+              onUpload={handleUpload} 
+              isProcessing={isProcessing} 
+              pdfCount={segregatedContents.length} 
+              questionCount={allQuestions.length} 
+              testHistory={testHistory}
+            />
           </TabsContent>
           <TabsContent value="theory" className="mt-6">
             <TheoryZoneTab contents={segregatedContents} />
@@ -138,7 +153,7 @@ export default function AptitudeAceClient() {
             <QuestionBankTab questions={allQuestions} onQuestionUpdate={handleQuestionUpdate} segregatedContents={segregatedContents} />
           </TabsContent>
           <TabsContent value="test-generator" className="mt-6">
-            <TestGeneratorTab questions={allQuestions} />
+            <TestGeneratorTab questions={allQuestions} onTestComplete={handleTestComplete} />
           </TabsContent>
         </Tabs>
       </div>

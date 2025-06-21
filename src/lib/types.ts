@@ -1,3 +1,5 @@
+import type { GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
+
 export type ChatMessage = {
   role: 'user' | 'model';
   content: string;
@@ -20,4 +22,14 @@ export type SegregatedContent = {
   theory: string;
   questions: Question[];
   sourceFile: string;
+};
+
+export type TestResult = {
+  id: string;
+  date: string; // ISO string
+  questions: Question[];
+  userAnswers: Record<string, string>;
+  feedback: GenerateTestFeedbackOutput | null;
+  score: number;
+  total: number;
 };

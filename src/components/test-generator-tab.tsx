@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Question } from '@/lib/types';
+import { Question, TestResult } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,6 @@ import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, R
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { generateTestFeedbackAction } from '@/app/actions';
-import type { GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from '@/components/ui/progress';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
@@ -27,31 +26,28 @@ type TestStatus = 'configuring' | 'in-progress' | 'results';
 const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard'];
 
 function TestResults({
-  test,
-  userAnswers,
-  feedback,
+  testResult,
   onRestart,
   isLoadingFeedback,
 }: {
-  test: Question[];
-  userAnswers: Record<string, string>;
-  feedback: GenerateTestFeedbackOutput | null;
+  testResult: TestResult;
   onRestart: () => void;
   isLoadingFeedback: boolean;
 }) {
-  const { score, total, performanceByTopic } = useMemo(() => {
-    let score = 0;
+  const { score, total, feedback, questions: test, userAnswers } = testResult;
+
+  const performanceByTopic = useMemo(() => {
     const performance: Record<string, { correct: number; total: number }> = {};
 
     test.forEach(q => {
       const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
-      if (isCorrect) score++;
-
-      if (!performance[q.topic]) {
-        performance[q.topic] = { correct: 0, total: 0 };
+      
+      const topic = q.topic || 'Uncategorized';
+      if (!performance[topic]) {
+        performance[topic] = { correct: 0, total: 0 };
       }
-      performance[q.topic].total++;
-      if (isCorrect) performance[q.topic].correct++;
+      performance[topic].total++;
+      if (isCorrect) performance[topic].correct++;
     });
 
     const chartData = Object.entries(performance).map(([topic, data]) => ({
@@ -60,7 +56,7 @@ function TestResults({
         Incorrect: data.total - data.correct,
     }));
 
-    return { score, total: test.length, performanceByTopic: chartData };
+    return chartData;
   }, [test, userAnswers]);
 
   return (
@@ -147,7 +143,7 @@ function TestResults({
 }
 
 
-export default function TestGeneratorTab({ questions }: { questions: Question[] }) {
+export default function TestGeneratorTab({ questions, onTestComplete }: { questions: Question[], onTestComplete: (result: TestResult) => void; }) {
   const [topicFilter, setTopicFilter] = useState('All');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [sourceFileFilter, setSourceFileFilter] = useState<string[]>([]);
@@ -158,15 +154,15 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
   const [generatedTest, setGeneratedTest] = useState<Question[]>([]);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [feedback, setFeedback] = useState<GenerateTestFeedbackOutput | null>(null);
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [completedTest, setCompletedTest] = useState<TestResult | null>(null);
 
   const { toast } = useToast();
 
   const handleFinishTest = useCallback(async () => {
-      setStatus('results');
       setIsLoadingFeedback(true);
+      setStatus('results');
       
       const resultsForAI = generatedTest.map(q => ({
           questionText: q.text,
@@ -177,14 +173,32 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
       }));
 
       const feedbackResult = await generateTestFeedbackAction({ results: resultsForAI });
+      
+      let score = 0;
+      generatedTest.forEach(q => {
+          const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
+          if (isCorrect) score++;
+      });
+      
+      const testResult: TestResult = {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        questions: generatedTest,
+        userAnswers,
+        feedback: 'error' in feedbackResult ? null : feedbackResult,
+        score,
+        total: generatedTest.length,
+      };
+      
+      onTestComplete(testResult);
+      setCompletedTest(testResult);
+
       if ('error' in feedbackResult) {
           toast({ variant: 'destructive', title: 'Feedback Error', description: feedbackResult.error });
-      } else {
-          setFeedback(feedbackResult);
       }
       setIsLoadingFeedback(false);
 
-  }, [generatedTest, userAnswers, toast]);
+  }, [generatedTest, userAnswers, toast, onTestComplete]);
 
   useEffect(() => {
     if (status !== 'in-progress') return;
@@ -239,7 +253,7 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
     setStatus('in-progress');
     setCurrentQuestionIndex(0);
     setUserAnswers({});
-    setFeedback(null);
+    setCompletedTest(null);
   };
   
   const handleAnswerChange = (questionId: string, answer: string) => {
@@ -307,8 +321,8 @@ export default function TestGeneratorTab({ questions }: { questions: Question[] 
     )
   }
 
-  if (status === 'results') {
-    return <TestResults test={generatedTest} userAnswers={userAnswers} feedback={feedback} onRestart={handleRestart} isLoadingFeedback={isLoadingFeedback} />
+  if (status === 'results' && completedTest) {
+    return <TestResults testResult={completedTest} onRestart={handleRestart} isLoadingFeedback={isLoadingFeedback} />
   }
 
   return (
