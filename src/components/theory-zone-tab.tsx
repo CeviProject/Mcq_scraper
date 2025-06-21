@@ -6,6 +6,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SegregatedContent } from '@/lib/types';
 import { BookOpen } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface TheoryZoneTabProps {
   contents: SegregatedContent[];
@@ -39,9 +41,12 @@ export default function TheoryZoneTab({ contents }: TheoryZoneTabProps) {
               <AccordionTrigger>{content.sourceFile}</AccordionTrigger>
               <AccordionContent>
                 <ScrollArea className="h-72 w-full rounded-md border p-4">
-                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap font-body">
+                  <ReactMarkdown
+                    className="prose prose-sm dark:prose-invert max-w-none"
+                    remarkPlugins={[remarkGfm]}
+                  >
                     {content.theory}
-                  </div>
+                  </ReactMarkdown>
                 </ScrollArea>
               </AccordionContent>
             </AccordionItem>

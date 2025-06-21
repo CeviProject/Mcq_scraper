@@ -21,8 +21,8 @@ const ContentSegregationInputSchema = z.object({
 export type ContentSegregationInput = z.infer<typeof ContentSegregationInputSchema>;
 
 const ContentSegregationOutputSchema = z.object({
-  theory: z.string().describe('The extracted theory content from the PDF.'),
-  questions: z.string().describe('The extracted questions from the PDF.'),
+  theory: z.string().describe('The extracted theory content from the PDF. Preserve formatting and use Markdown for structure (headings, lists, etc.).'),
+  questions: z.array(z.string()).describe('An array of all extracted questions. Each question should be a single string in the array.'),
 });
 export type ContentSegregationOutput = z.infer<typeof ContentSegregationOutputSchema>;
 
@@ -39,11 +39,11 @@ const prompt = ai.definePrompt({
   Here's the content of the PDF:
   {{media url=pdfDataUri}}
 
-  Identify and extract all theory, explanations, and concepts presented in the document. These are generally descriptive sections intended to educate the reader.
+  1.  **Extract Theory**: Identify and extract all theory, explanations, and concepts. Preserve the original formatting, including paragraphs, lists, and tables. Return this content as a single string formatted with Markdown.
 
-  Also, identify and extract all questions, problems, and exercises presented in the document. These are generally sections that require the reader to apply their knowledge to find a solution.
+  2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. Each complete question (including all its parts if it's a multi-part question) should be a separate element in a JSON array of strings. Do not include the question numbers (e.g., "1.", "Q2.", etc.) in the extracted question text.
 
-  Return the extracted theory and questions in a structured format.
+  Return the extracted theory and the array of questions in the specified structured format.
   `,
 });
 

@@ -39,8 +39,6 @@ export default function AptitudeAceClient() {
               }
               
               const questions = result.questions
-                .split(/\n\s*(?=\d+\.\s*)/)
-                .map(q => q.trim().replace(/^\d+\.\s*/, ''))
                 .filter(q => q.length > 5)
                 .map((qText): Question => ({
                   id: crypto.randomUUID(),

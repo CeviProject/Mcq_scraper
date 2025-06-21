@@ -27,7 +27,7 @@ function QuestionItem({ question, onQuestionUpdate }: { question: Question, onQu
   return (
     <Card>
       <CardContent className="p-6">
-        <p className="text-foreground mb-4">{question.text}</p>
+        <p className="text-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
         <div className="flex flex-wrap gap-2 mb-4">
           <Badge variant="secondary"><File className="w-3 h-3 mr-1"/>{question.sourceFile}</Badge>
           <Badge variant={question.isUnique ? "default" : "outline"}><Sparkles className="w-3 h-3 mr-1"/>{question.isUnique ? 'Unique' : 'Common'}</Badge>
@@ -68,7 +68,7 @@ function QuestionItem({ question, onQuestionUpdate }: { question: Question, onQu
                 </DialogHeader>
                 <div className="py-4">
                   <h4 className="font-semibold mb-2">Question:</h4>
-                  <p className="text-sm text-muted-foreground mb-4">{question.text}</p>
+                  <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
                   <Label htmlFor={`solution-${question.id}`} className="font-semibold">Your Solution/Notes</Label>
                   <Textarea id={`solution-${question.id}`} value={solution} onChange={(e) => setSolution(e.target.value)} className="mt-2 min-h-[150px]" />
                 </div>
