@@ -51,7 +51,7 @@ export default function UploadTab({ onUpload, isProcessing, processingProgress }
     >
         <CardHeader>
             <CardTitle>Upload Your PDFs</CardTitle>
-            <CardDescription>Drag and drop your aptitude test PDFs here or click to select files.</CardDescription>
+            <CardDescription>Drag and drop one or more aptitude test PDFs here, or click to select files.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 flex-grow flex flex-col justify-center">
         {isProcessing && processingProgress ? (
@@ -68,7 +68,7 @@ export default function UploadTab({ onUpload, isProcessing, processingProgress }
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
                     <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                    <p className="text-xs text-muted-foreground">PDF files only</p>
+                    <p className="text-xs text-muted-foreground">You can select multiple PDF files</p>
                 </div>
                 <input id="dropzone-file" type="file" className="hidden" accept=".pdf" multiple onChange={handleChange} disabled={isProcessing} />
                 </label>
