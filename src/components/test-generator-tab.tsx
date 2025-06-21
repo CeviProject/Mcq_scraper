@@ -228,10 +228,9 @@ export default function TestGeneratorTab({ questions, onTestComplete }: { questi
   const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
   
   const testableQuestions = useMemo(() => {
-    // A question is "testable" if it has options and a correct answer has been identified for it.
+    // A question is "testable" if it has options and a solution has been generated.
     return questions.filter(q => 
-        q.options && q.options.length > 0 && 
-        q.correctOption // This implies a solution has been generated.
+        q.options && q.options.length > 0 && q.solution
     );
   }, [questions]);
 
