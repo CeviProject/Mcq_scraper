@@ -267,7 +267,7 @@ export async function batchSolveQuestionsAction(input: Omit<BatchSolveInput, 'ap
                 user_id: user.id,
             }));
 
-            const { error: updateError } = await supabase.from('questions').upsert(updates);
+            const { error: updateError } = await supabase.from('questions').upsert(updates, { defaultToNull: false });
             if (updateError) {
                 // The RLS policy message is not very user-friendly, so we provide a clearer one.
                 if (updateError.message.includes('violates row-level security policy')) {
