@@ -1,22 +1,58 @@
 'use client'
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload } from 'lucide-react';
 import { SegregatedContent, Question, TestResult } from '@/lib/types';
 import { segregateContentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import DashboardTab from './dashboard-tab';
+import UploadTab from './upload-tab';
 import TheoryZoneTab from './theory-zone-tab';
 import QuestionBankTab from './question-bank-tab';
 import TestGeneratorTab from './test-generator-tab';
+import SettingsSheet from './settings-sheet';
+import { Skeleton } from './ui/skeleton';
 
 export default function AptitudeAceClient() {
   const [segregatedContents, setSegregatedContents] = useState<SegregatedContent[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState<[number, number] | null>(null);
   const [testHistory, setTestHistory] = useState<TestResult[]>([]);
+  
+  const [username, setUsername] = useState('');
+  const [theme, setTheme] = useState('dark');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    // Theme logic
+    const storedTheme = localStorage.getItem('aptitude-ace-theme') || 'dark';
+    setTheme(storedTheme);
+
+    // Username logic
+    const storedUsername = localStorage.getItem('aptitude-ace-username') || 'Guest';
+    setUsername(storedUsername);
+  }, []);
+
+  useEffect(() => {
+    if (isClient) {
+      const root = window.document.documentElement;
+      root.classList.remove('light', 'dark');
+      root.classList.add(theme);
+      localStorage.setItem('aptitude-ace-theme', theme);
+    }
+  }, [theme, isClient]);
+  
+  const handleUsernameChange = (newName: string) => {
+    const finalUsername = newName.trim() === '' ? 'Guest' : newName.trim();
+    setUsername(finalUsername);
+    localStorage.setItem('aptitude-ace-username', finalUsername);
+  };
+
+
   const { toast } = useToast();
 
   const handleTestComplete = useCallback((result: TestResult) => {
@@ -157,8 +193,13 @@ export default function AptitudeAceClient() {
             <BrainCircuit className="h-8 w-8 text-primary" />
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Aptitude Ace</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" size="icon">
+          <div className="ml-auto flex items-center gap-4">
+            {isClient ? (
+                <span className="text-sm text-muted-foreground hidden md:block">Welcome, {username}</span>
+            ) : (
+                <Skeleton className="h-5 w-24 hidden md:block" />
+            )}
+            <Button variant="outline" size="icon" onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4" />
               <span className="sr-only">Settings</span>
             </Button>
@@ -166,8 +207,9 @@ export default function AptitudeAceClient() {
       </header>
       <div className="container mx-auto p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
             <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</TabsTrigger>
+            <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Upload</TabsTrigger>
             <TabsTrigger value="theory" className="gap-2" disabled={segregatedContents.length === 0}><BookOpen className="h-4 w-4" />Theory Zone</TabsTrigger>
             <TabsTrigger value="questions" className="gap-2" disabled={allQuestions.length === 0}><ListChecks className="h-4 w-4" />Question Bank</TabsTrigger>
             <TabsTrigger value="test-generator" className="gap-2" disabled={allQuestions.length === 0}><FileText className="h-4 w-4" />Test Generator</TabsTrigger>
@@ -175,12 +217,16 @@ export default function AptitudeAceClient() {
 
           <TabsContent value="dashboard" className="mt-6">
             <DashboardTab 
-              onUpload={handleUpload} 
-              isProcessing={isProcessing}
-              processingProgress={processingProgress}
               sourceFiles={sourceFiles}
               questionCount={allQuestions.length} 
               testHistory={testHistory}
+            />
+          </TabsContent>
+          <TabsContent value="upload" className="mt-6">
+            <UploadTab 
+              onUpload={handleUpload} 
+              isProcessing={isProcessing}
+              processingProgress={processingProgress}
             />
           </TabsContent>
           <TabsContent value="theory" className="mt-6">
@@ -198,6 +244,14 @@ export default function AptitudeAceClient() {
           </TabsContent>
         </Tabs>
       </div>
+       <SettingsSheet
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        theme={theme}
+        setTheme={setTheme}
+        username={username}
+        setUsername={handleUsernameChange}
+      />
     </div>
   );
 }

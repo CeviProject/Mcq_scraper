@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UploadCloud, File, HelpCircle, Loader2, List, Trophy, Activity } from 'lucide-react';
+import { File, HelpCircle, List, Trophy, Activity, BarChart } from 'lucide-react';
 import Image from 'next/image';
 import { TestResult } from '@/lib/types';
 import ActivityCalendar from './activity-calendar';
@@ -11,49 +11,16 @@ import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, T
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { normalizeOption } from '@/lib/utils';
-import { Progress } from './ui/progress';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface DashboardTabProps {
-  onUpload: (files: File[]) => void;
-  isProcessing: boolean;
-  processingProgress: [number, number] | null;
   sourceFiles: string[];
   questionCount: number;
   testHistory: TestResult[];
 }
 
-export default function DashboardTab({ onUpload, isProcessing, processingProgress, sourceFiles, questionCount, testHistory }: DashboardTabProps) {
-  const [dragActive, setDragActive] = useState(false);
-
+export default function DashboardTab({ sourceFiles, questionCount, testHistory }: DashboardTabProps) {
   const pdfCount = sourceFiles.length;
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onUpload(Array.from(e.dataTransfer.files));
-    }
-  }, [onUpload]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    if (e.target.files && e.target.files.length > 0) {
-      onUpload(Array.from(e.target.files));
-    }
-  };
   
   const analyticsData = useMemo(() => {
     if (testHistory.length === 0) {
@@ -82,9 +49,11 @@ export default function DashboardTab({ onUpload, isProcessing, processingProgres
             topicData[topic] = { correct: 0, total: 0 };
           }
           topicData[topic].total++;
-          const isCorrect = normalizeOption(test.userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
-          if (isCorrect) {
-            topicData[topic].correct++;
+          if (test.feedback) { // Only count if feedback (and thus correct answers) are available
+            const result = test.feedback.results.find(r => r.questionText === q.text);
+            if (result?.isCorrect) {
+              topicData[topic].correct++;
+            }
           }
       });
     });
@@ -108,132 +77,64 @@ export default function DashboardTab({ onUpload, isProcessing, processingProgres
 
   return (
     <div className="grid gap-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-            <Card 
-                className={`transition-colors h-full flex flex-col ${dragActive ? "border-primary bg-primary/10" : ""}`}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-            >
-                <CardHeader>
-                    <CardTitle>Upload Your PDFs</CardTitle>
-                    <CardDescription>Drag and drop your aptitude test PDFs here or click to select files.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 flex-grow flex flex-col justify-center">
-                {isProcessing && processingProgress ? (
-                  <div className="space-y-3 text-center px-4">
-                    <Loader2 className="w-10 h-10 mb-3 text-muted-foreground animate-spin mx-auto" />
-                    <Progress value={(processingProgress[0] / processingProgress[1]) * 100} className="w-full" />
-                    <p className="text-sm text-muted-foreground">Processing file {processingProgress[0]} of {processingProgress[1]}...</p>
-                    <p className="text-xs text-muted-foreground">Please wait, this may take a moment.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-center w-full">
-                        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted transition-colors">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
-                            <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                            <p className="text-xs text-muted-foreground">PDF files only</p>
-                        </div>
-                        <input id="dropzone-file" type="file" className="hidden" accept=".pdf" multiple onChange={handleChange} disabled={isProcessing} />
-                        </label>
-                    </div>
-                    <div className="flex justify-center">
-                        <Button onClick={() => document.getElementById('dropzone-file')?.click()} disabled={isProcessing}>
-                          Select Files
-                        </Button>
-                    </div>
-                  </>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Uploaded PDFs</CardTitle>
+                <File className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{pdfCount}</div>
+                 {pdfCount > 0 && (
+                  <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                          <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground -mt-1">View files</Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                          <DropdownMenuLabel>Uploaded Files</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {sourceFiles.map((file) => (
+                              <DropdownMenuItem key={file} className="truncate">{file}</DropdownMenuItem>
+                          ))}
+                      </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
-                </CardContent>
-            </Card>
-        </div>
-        <div className="space-y-6">
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Uploaded PDFs</CardTitle>
-                    <File className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{pdfCount}</div>
-                    <p className="text-xs text-muted-foreground mb-1">Total documents processed</p>
-                    {pdfCount > 0 && (
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground -mt-1">View files</Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start">
-                              <DropdownMenuLabel>Uploaded Files</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              {sourceFiles.map((file) => (
-                                  <DropdownMenuItem key={file} className="truncate">{file}</DropdownMenuItem>
-                              ))}
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Question Pool</CardTitle>
-                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{questionCount}</div>
-                    <p className="text-xs text-muted-foreground">Total questions available</p>
-                </CardContent>
-            </Card>
-        </div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Question Pool</CardTitle>
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{questionCount}</div>
+                <p className="text-xs text-muted-foreground">Total questions available</p>
+            </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tests Taken</CardTitle>
+            <List className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analyticsData.totalTests}</div>
+            <p className="text-xs text-muted-foreground">Total mock tests completed</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analyticsData.avgScore}%</div>
+            <p className="text-xs text-muted-foreground">Across all tests</p>
+          </CardContent>
+        </Card>
       </div>
       
       {testHistory.length > 0 ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Tests Taken</CardTitle>
-                <List className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalTests}</div>
-                <p className="text-xs text-muted-foreground">Total mock tests completed</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Score</CardTitle>
-                <Trophy className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.avgScore}%</div>
-                <p className="text-xs text-muted-foreground">Across all tests</p>
-              </CardContent>
-            </Card>
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Last Test</CardTitle>
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{testHistory.slice(-1)[0].score}/{testHistory.slice(-1)[0].total}</div>
-                    <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(testHistory.slice(-1)[0].date), { addSuffix: true })}</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Best Topic</CardTitle>
-                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl font-bold truncate">{analyticsData.topicPerformance[0]?.name || 'N/A'}</div>
-                    <p className="text-xs text-muted-foreground">with {analyticsData.topicPerformance[0]?.Accuracy || 0}% accuracy</p>
-                </CardContent>
-            </Card>
-          </div>
-
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <ActivityCalendar data={analyticsData.activityData} title="Test Activity" />
             <Card>
@@ -293,12 +194,12 @@ export default function DashboardTab({ onUpload, isProcessing, processingProgres
           </Card>
         </div>
       ) : (
-         <div className="relative w-full h-64 md:h-80 rounded-lg overflow-hidden shadow-lg">
+         <div className="relative w-full h-64 md:h-80 rounded-lg overflow-hidden shadow-lg border">
              <Image src="https://placehold.co/1200x400.png" alt="Student studying" layout="fill" objectFit="cover" data-ai-hint="learning study" />
-             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <div className="text-center text-white p-4">
-                    <h2 className="text-3xl font-bold font-headline">Turn PDFs into Power</h2>
-                    <p className="mt-2 max-w-2xl">Take a test to start tracking your progress and unlock your personalized analytics dashboard!</p>
+                    <h2 className="text-3xl font-bold font-headline">Unlock Your Potential</h2>
+                    <p className="mt-2 max-w-2xl text-lg">Take a test to start tracking your progress and get personalized AI-powered feedback!</p>
                 </div>
              </div>
          </div>

@@ -1,4 +1,4 @@
-import type { GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
+import type { GenerateTestFeedbackOutput, GenerateTestFeedbackInput } from '@/ai/flows/test-feedback';
 
 export type ChatMessage = {
   role: 'user' | 'model';
@@ -32,4 +32,5 @@ export type TestResult = {
   feedback: GenerateTestFeedbackOutput | null;
   score: number;
   total: number;
+  results: GenerateTestFeedbackInput['results'];
 };

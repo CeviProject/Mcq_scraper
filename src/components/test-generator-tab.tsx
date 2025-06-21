@@ -22,17 +22,15 @@ import { cn, normalizeOption } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
-type TestStatus = 'configuring' | 'in-progress' | 'results';
+type TestStatus = 'configuring' | 'in-progress' | 'finishing' | 'results';
 const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard'];
 
 function TestResults({
   testResult,
   onRestart,
-  isLoadingFeedback,
 }: {
   testResult: TestResult;
   onRestart: () => void;
-  isLoadingFeedback: boolean;
 }) {
   const { score, total, feedback, questions: test, userAnswers } = testResult;
 
@@ -89,7 +87,7 @@ function TestResults({
                     <CardTitle className="text-base">AI Feedback</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {isLoadingFeedback && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /> Generating feedback...</div>}
+                    {!feedback && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /> Generating feedback...</div>}
                     {feedback && (
                         <div className="space-y-4">
                            <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{feedback.overallFeedback}</ReactMarkdown>
@@ -156,7 +154,6 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   const [generatedTest, setGeneratedTest] = useState<Question[]>([]);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [isGeneratingSolutions, setIsGeneratingSolutions] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [completedTest, setCompletedTest] = useState<TestResult | null>(null);
@@ -164,16 +161,15 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   const { toast } = useToast();
 
   const handleFinishTest = useCallback(async () => {
-      setIsLoadingFeedback(true);
-      setStatus('results');
-
+      setStatus('finishing');
+      
       let score = 0;
       generatedTest.forEach(q => {
           const isCorrect = normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || '');
           if (isCorrect) score++;
       });
       
-      const resultsForAI = generatedTest.map(q => ({
+      const resultsForFeedback = generatedTest.map(q => ({
           questionText: q.text,
           topic: q.topic,
           userAnswer: userAnswers[q.id] || "Not Answered",
@@ -181,29 +177,34 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
           isCorrect: normalizeOption(userAnswers[q.id] || '') === normalizeOption(q.correctOption || ''),
       }));
       
-      const testResult: TestResult = {
+      let testResult: TestResult = {
         id: crypto.randomUUID(),
         date: new Date().toISOString(),
         questions: generatedTest,
         userAnswers,
-        feedback: null,
+        feedback: null, // Initially null
         score,
         total: generatedTest.length,
+        results: resultsForFeedback,
       };
 
-      const feedbackResult = await generateTestFeedbackAction({ results: resultsForAI });
+      setCompletedTest(testResult);
+      setStatus('results');
+
+      // Generate feedback in the background
+      const feedbackResult = await generateTestFeedbackAction({ results: resultsForFeedback });
       
       if (!('error' in feedbackResult)) {
-        testResult.feedback = feedbackResult;
+        // We need to update the state of the completedTest with the new feedback
+        setCompletedTest(prevResult => prevResult ? {...prevResult, feedback: feedbackResult} : null);
+        // And also call the parent handler to update the global history
+        onTestComplete({...testResult, feedback: feedbackResult});
+      } else {
+         toast({ variant: 'destructive', title: 'Feedback Error', description: feedbackResult.error });
+         // Still save the test result without feedback
+         onTestComplete(testResult);
       }
       
-      onTestComplete(testResult);
-      setCompletedTest(testResult);
-
-      if ('error' in feedbackResult) {
-          toast({ variant: 'destructive', title: 'Feedback Error', description: feedbackResult.error });
-      }
-      setIsLoadingFeedback(false);
 
   }, [generatedTest, userAnswers, toast, onTestComplete]);
 
@@ -235,8 +236,6 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   const sourceFiles = useMemo(() => [...Array.from(new Set(questions.map(q => q.sourceFile)))], [questions]);
   
   const testableQuestions = useMemo(() => {
-    // A question is "testable" if it has options AND a solution.
-    // We can generate solutions on the fly now.
     return questions.filter(q => q.options && q.options.length > 0);
   }, [questions]);
 
@@ -332,6 +331,18 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
     );
   }
 
+  if (status === 'finishing') {
+    return (
+      <Card className="flex flex-col items-center justify-center py-20 text-center">
+        <CardHeader>
+            <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto" />
+            <CardTitle className="mt-4">Generating Your Results...</CardTitle>
+            <CardDescription>Please wait while we analyze your performance and generate AI feedback.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   if (status === 'in-progress') {
     const currentQuestion = generatedTest[currentQuestionIndex];
     const progress = ((currentQuestionIndex) / generatedTest.length) * 100;
@@ -376,7 +387,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   }
 
   if (status === 'results' && completedTest) {
-    return <TestResults testResult={completedTest} onRestart={handleRestart} isLoadingFeedback={isLoadingFeedback} />
+    return <TestResults testResult={completedTest} onRestart={handleRestart} />
   }
 
   return (
