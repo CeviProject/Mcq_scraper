@@ -16,9 +16,8 @@ import SettingsSheet from './settings-sheet';
 import { createClient } from '@/lib/supabase';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
-const supabase: SupabaseClient = createClient();
-
 export default function AptitudeAceClient({ session, profile: initialProfile }: { session: Session | null, profile: Profile | null }) {
+  const supabase: SupabaseClient = useMemo(() => createClient(), []);
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -71,7 +70,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
 
     fetchData();
 
-  }, [session, toast]);
+  }, [session, toast, supabase]);
   
   useEffect(() => {
     const storedTheme = localStorage.getItem('aptitude-ace-theme') || 'dark';
@@ -128,7 +127,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
         title: "Test Saved",
         description: "Your test results have been saved to your dashboard.",
     });
-  }, [session, toast]);
+  }, [session, toast, supabase]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     if (!session) {
@@ -202,7 +201,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
         setQuestions(prev => prev.filter(q => q.document_id !== documentId));
         toast({ title: 'Document Deleted', description: 'The document and its questions have been removed.' });
     }
-  }, [session, toast]);
+  }, [session, toast, supabase]);
 
  const handleDocumentRename = useCallback(async (documentId: string, newName: string) => {
     if (!session) {
@@ -219,7 +218,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
         setQuestions(prev => prev.map(q => q.document_id === documentId ? { ...q, sourceFile: updatedDocument.source_file } : q));
         toast({ title: 'Document Renamed' });
     }
-  }, [session, toast]);
+  }, [session, toast, supabase]);
 
 
   const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
@@ -231,7 +230,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     } else {
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...updateData } : q));
     }
-  }, [toast]);
+  }, [toast, supabase]);
   
   const handleQuestionsUpdate = useCallback((updates: (Partial<Question> & { id: string })[]) => {
     const updatesMap = new Map(updates.map(u => [u.id, u]));
