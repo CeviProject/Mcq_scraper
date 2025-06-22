@@ -68,11 +68,12 @@ Performance Data (Topic, Accuracy %):
 Your Task:
 1.  **Analyze Performance**: Identify the topics where the student's accuracy is lowest. These are their weak areas and should be prioritized.
 2.  **Create a 7-Day Plan**: Generate a structured revision plan for the next seven days (Monday to Sunday).
-3.  **Prioritize Weak Topics**: Assign the weakest topics to the earlier days of the week.
-4.  **Ensure Variety**: Do not assign the same topic on consecutive days. Mix in some of the user's stronger topics later in the week to build confidence.
-5.  **Include a Rest Day**: Designate one day (e.g., Sunday) as a rest day or for light review.
-6.  **Provide Encouraging Reasons**: For each study day, provide a short, positive reason for focusing on that topic (e.g., "Let's build a strong foundation here," or "Time to solidify your understanding.").
-7.  **Format the Output**: Return the plan as a JSON array of objects, with each object containing the day, the topic to study, and the reason.
+3.  **Use Provided Topics**: For each study day, the 'topic' field in your response MUST BE one of the topics from the provided Performance Data. Do not invent new topics.
+4.  **Prioritize Weak Topics**: Assign the weakest topics (lowest accuracy) to the earlier days of the week.
+5.  **Ensure Variety**: Do not assign the same topic on consecutive days. Mix in some of the user's stronger topics later in the week to build confidence.
+6.  **Include a Rest Day**: Designate one day (e.g., Sunday) as a rest day. For this day, set the 'topic' field to "Rest Day".
+7.  **Provide Encouraging Reasons**: For each study day, provide a short, positive reason for focusing on that topic (e.g., "Let's build a strong foundation here," or "Time to solidify your understanding.").
+8.  **Format the Output**: Return the plan as a JSON array of objects, with each object containing the day, the topic to study, and the reason.
 `,
         });
 
