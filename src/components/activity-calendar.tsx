@@ -64,51 +64,56 @@ const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ data, title = "Acti
           <CardDescription>Your test activity over the last year.</CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center">
-          <div className="flex flex-col">
-            <div className="flex gap-1" style={{ paddingLeft: '2.5rem' }}>
-                {monthLabels.map(({ label, weekIndex }) => (
-                    <div 
-                        key={weekIndex} 
-                        className="text-xs text-muted-foreground" 
-                        style={{ minWidth: `calc(4 * 0.875rem)` }} // 4 weeks of (dot_width + gap)
-                    >
-                        {label}
-                    </div>
-                ))}
-            </div>
-            <div className="flex gap-3 mt-1">
-              <div className="flex flex-col text-xs text-muted-foreground justify-between py-[1px]">
+          <div className="inline-flex flex-col gap-2">
+            <div className="flex gap-3">
+              <div className="flex flex-col w-6 text-xs text-muted-foreground justify-between pt-5">
                   <span className="h-2.5">Mon</span>
                   <span className="h-2.5">Wed</span>
                   <span className="h-2.5">Fri</span>
               </div>
-              <div className="flex gap-1">
-                  {weeks.map((week, i) => (
-                    <div key={i} className="flex flex-col gap-1">
-                      {week.map((day, j) => {
-                        if (!day) return <div key={j} className="h-2.5 w-2.5 rounded-sm bg-secondary/60" />;
-                        
-                        const dateKey = format(day, 'yyyy-MM-dd');
-                        const count = dateCounts.get(dateKey) || 0;
-                        return (
-                          <Tooltip key={dateKey} delayDuration={100}>
-                            <TooltipTrigger asChild>
-                              <div
-                                className={cn('h-2.5 w-2.5 rounded-sm', getColor(count))}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{count} test{count !== 1 ? 's' : ''} on {format(day, 'MMM d, yyyy')}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })}
-                    </div>
-                  ))}
+              <div className="flex flex-col">
+                 <div className="flex">
+                    {monthLabels.map(({ label, weekIndex }) => (
+                      <div 
+                          key={weekIndex} 
+                          className="text-xs text-muted-foreground" 
+                          style={{
+                              // A dot is 0.625rem (w-2.5) + gap is 0.25rem (gap-1) = 0.875rem per column
+                              minWidth: `calc(4 * 0.875rem)`
+                          }}
+                      >
+                          {label}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                      {weeks.map((week, i) => (
+                        <div key={i} className="flex flex-col gap-1">
+                          {week.map((day, j) => {
+                            if (!day) return <div key={j} className="h-2.5 w-2.5 rounded-sm bg-secondary/60" />;
+                            
+                            const dateKey = format(day, 'yyyy-MM-dd');
+                            const count = dateCounts.get(dateKey) || 0;
+                            return (
+                              <Tooltip key={dateKey} delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className={cn('h-2.5 w-2.5 rounded-sm', getColor(count))}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{count} test{count !== 1 ? 's' : ''} on {format(day, 'MMM d, yyyy')}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                        </div>
+                      ))}
+                  </div>
               </div>
             </div>
             
-             <div className="flex justify-end items-center gap-2 text-xs text-muted-foreground mt-4">
+             <div className="flex justify-end items-center gap-2 text-xs text-muted-foreground pr-1">
                 <span>Less</span>
                 <div className={cn("w-2.5 h-2.5 rounded-sm border", getColor(0))} />
                 <div className={cn("w-2.5 h-2.5 rounded-sm", getColor(1))} />
