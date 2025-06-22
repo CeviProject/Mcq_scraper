@@ -53,6 +53,27 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
     if (!user) {
       throw new Error("Authentication error: You must be logged in to upload documents.");
     }
+    
+    // Ensure a profile exists for the user before proceeding.
+    // This prevents foreign key constraint violations if a profile wasn't created on sign-up.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          username: user.email?.split('@')[0] || `user-${user.id.substring(0, 6)}`,
+        });
+      
+      if (profileError) {
+        throw new Error(`Failed to create user profile: ${profileError.message}`);
+      }
+    }
 
     const apiKey = await getApiKey(); 
     
