@@ -24,6 +24,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Switch } from '@/components/ui/switch';
 import { createClient } from '@/lib/supabase';
 
+type TestStatus = 'configuring' | 'in-progress' | 'finishing' | 'results';
+
 function WhyWrongDialog({ question, userAnswer }: { question: Question, userAnswer: string }) {
     const [explanation, setExplanation] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -267,6 +269,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
 
   const { toast } = useToast();
   const supabase = useMemo(() => createClient(), []);
+  const difficultyOptions = ['Easy', 'Medium', 'Hard'];
 
   const handleFinishTest = useCallback(async () => {
       setStatus('finishing');
