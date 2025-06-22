@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2, Bookmark } from 'lucide-react';
+import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2, Bookmark, CalendarClock } from 'lucide-react';
 import { Document, Question, TestResult, ChatMessage, Test, Profile } from '@/lib/types';
 import { segregateContentAction, deleteDocumentAction, renameDocumentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import QuestionBankTab from './question-bank-tab';
 import TestGeneratorTab from './test-generator-tab';
 import ReviewTab from './review-tab';
 import SettingsSheet from './settings-sheet';
+import RevisionPlannerTab from './revision-planner-tab';
 import { createClient } from '@/lib/supabase';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
@@ -225,14 +226,12 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
   const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
     const { id, ...updateData } = updatedQuestion;
     
-    // Optimistically update UI
     setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...updateData } : q));
 
     const { error } = await supabase.from('questions').update(updateData).eq('id', id);
 
     if (error) {
         toast({ variant: 'destructive', title: 'Error updating question', description: error.message });
-        // Revert UI on error
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...questions.find(oq => oq.id === id) } : q));
     }
   }, [toast, supabase, questions]);
@@ -273,13 +272,14 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
       </header>
       <div className="container mx-auto p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 h-auto">
             <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</TabsTrigger>
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Upload</TabsTrigger>
-            <TabsTrigger value="theory" className="gap-2" disabled={documents.length === 0}><BookOpen className="h-4 w-4" />Theory Zone</TabsTrigger>
-            <TabsTrigger value="questions" className="gap-2" disabled={questions.length === 0}><ListChecks className="h-4 w-4" />Question Bank</TabsTrigger>
+            <TabsTrigger value="theory" className="gap-2" disabled={documents.length === 0}><BookOpen className="h-4 w-4" />Theory</TabsTrigger>
+            <TabsTrigger value="questions" className="gap-2" disabled={questions.length === 0}><ListChecks className="h-4 w-4" />Questions</TabsTrigger>
             <TabsTrigger value="review" className="gap-2" disabled={bookmarkedQuestions.length === 0}><Bookmark className="h-4 w-4" />Review</TabsTrigger>
-            <TabsTrigger value="test-generator" className="gap-2" disabled={questions.length === 0}><FileText className="h-4 w-4" />Test Generator</TabsTrigger>
+            <TabsTrigger value="test-generator" className="gap-2" disabled={questions.length === 0}><FileText className="h-4 w-4" />Mock Test</TabsTrigger>
+            <TabsTrigger value="revision-plan" className="gap-2" disabled={testHistory.length === 0}><CalendarClock className="h-4 w-4" />Revision Plan</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-6">
@@ -323,6 +323,9 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
               onTestComplete={handleTestComplete} 
               onQuestionsUpdate={handleQuestionsUpdate}
             />
+          </TabsContent>
+          <TabsContent value="revision-plan" className="mt-6">
+             <RevisionPlannerTab hasTakenTests={testHistory.length > 0} />
           </TabsContent>
         </Tabs>
       </div>

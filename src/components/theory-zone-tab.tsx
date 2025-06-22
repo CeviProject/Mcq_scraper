@@ -152,7 +152,7 @@ export default function TheoryZoneTab({ documents, onDocumentDelete, onDocumentR
                                         <AlertDialogHeader>
                                           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                           <AlertDialogDescription>
-                                            This action cannot be undone. This will permanently delete the document "{content.source_file}" and all of its associated questions.
+                                            This action cannot be undone. This will permanently delete the document "{content.source_file}", all of its associated questions, and any related test history.
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>

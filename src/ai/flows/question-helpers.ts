@@ -5,6 +5,7 @@
  * - getSolution - Generates a detailed solution for a given question.
  * - getTricks - Generates general tips and tricks for solving a given type of question.
  * - askFollowUp - Answers follow-up questions about a problem.
+ * - getWrongAnswerExplanation - Explains why a user's incorrect answer was wrong.
  */
 
 import {ai} from '@/ai/genkit';
@@ -214,6 +215,62 @@ const getTricksFlow = ai.defineFlow(
         });
 
         const {output} = await tricksPrompt(input);
+        return output!;
+    }
+);
+
+
+// "Why Wrong?" Explanation Flow
+const GetWrongAnswerExplanationInputSchema = z.object({
+    questionText: z.string().describe("The full text of the question."),
+    options: z.array(z.string()).optional().describe("The list of all multiple-choice options."),
+    correctOption: z.string().optional().describe("The text of the correct answer."),
+    userSelectedOption: z.string().describe("The incorrect option that the user chose."),
+    apiKey: z.string().optional().describe("User's Gemini API key."),
+});
+export type GetWrongAnswerExplanationInput = z.infer<typeof GetWrongAnswerExplanationInputSchema>;
+
+const GetWrongAnswerExplanationOutputSchema = z.object({
+    explanation: z.string().describe("A detailed explanation of why the user's chosen answer is incorrect, formatted in Markdown."),
+});
+export type GetWrongAnswerExplanationOutput = z.infer<typeof GetWrongAnswerExplanationOutputSchema>;
+
+export async function getWrongAnswerExplanation(input: GetWrongAnswerExplanationInput): Promise<GetWrongAnswerExplanationOutput> {
+  return getWrongAnswerExplanationFlow(input);
+}
+
+const getWrongAnswerExplanationFlow = ai.defineFlow(
+    {
+        name: 'getWrongAnswerExplanationFlow',
+        inputSchema: GetWrongAnswerExplanationInputSchema,
+        outputSchema: GetWrongAnswerExplanationOutputSchema,
+    },
+    async (input) => {
+        const key = input.apiKey || process.env.GOOGLE_API_KEY;
+        if (!key) {
+            throw new Error("A Gemini API key is required. Please add it in Settings or set GOOGLE_API_KEY in your environment.");
+        }
+        const dynamicAi = genkit({ plugins: [googleAI({ apiKey: key })] });
+
+        const wrongAnswerPrompt = dynamicAi.definePrompt({
+            name: 'getWrongAnswerExplanationPrompt_dynamic',
+            model: 'googleai/gemini-1.5-flash-latest',
+            input: {schema: GetWrongAnswerExplanationInputSchema},
+            output: {schema: GetWrongAnswerExplanationOutputSchema},
+            prompt: `You are a patient and insightful AI tutor. A student has answered a question incorrectly and needs to understand their mistake.
+
+Your task is to explain **why the user's selected answer is wrong**. Do not just explain why the correct answer is right. Focus on the potential trap or misunderstanding that led to the incorrect choice.
+
+Here is the context:
+- Question: {{{questionText}}}
+- The user incorrectly chose: **{{{userSelectedOption}}}**
+- The actual correct answer is: {{#if correctOption}}**{{{correctOption}}}**{{else}}Not provided{{/if}}
+
+Please provide a clear, concise explanation in Markdown, addressing the specific flaw in the logic of choosing "{{{userSelectedOption}}}". For example, if the user chose an answer that results from a common calculation error, point out that error.
+`,
+        });
+
+        const {output} = await wrongAnswerPrompt(input);
         return output!;
     }
 );

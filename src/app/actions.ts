@@ -1,7 +1,8 @@
 'use server';
 
 import { contentSegregation, ContentSegregationInput } from '@/ai/flows/content-segregation';
-import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksInput, GetTricksOutput, askFollowUp, AskFollowUpInput, AskFollowUpOutput } from '@/ai/flows/question-helpers';
+import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksInput, GetTricksOutput, askFollowUp, AskFollowUpInput, AskFollowUpOutput, getWrongAnswerExplanation, GetWrongAnswerExplanationInput, GetWrongAnswerExplanationOutput } from '@/ai/flows/question-helpers';
+import { generateRevisionPlan, GenerateRevisionPlanInput, GenerateRevisionPlanOutput } from '@/ai/flows/revision-planner';
 import { generateTestFeedback, GenerateTestFeedbackInput, GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
 import { batchSolveQuestions, BatchSolveInput, BatchSolveOutput } from '@/ai/flows/batch-question-solver';
 import { createServerClient } from '@supabase/ssr';
@@ -114,13 +115,11 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
             throw new Error("Authentication error: You must be logged in to delete documents.");
         }
 
-        // With ON DELETE CASCADE enabled in the database, we only need to delete the parent document.
-        // The database will automatically handle deleting all related questions and test attempts.
         const { error: documentError } = await supabase
             .from('documents')
             .delete()
             .eq('id', documentId)
-            .eq('user_id', user.id); // RLS is also in effect, but this adds an explicit check.
+            .eq('user_id', user.id); 
 
         if (documentError) {
             throw new Error(`Failed to delete document: ${documentError.message}`);
@@ -153,7 +152,6 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error("Authentication error.");
         }
 
-        // Step 1: Verify the document exists and the user owns it.
         const { data: docToRename, error: fetchError } = await supabase
             .from('documents')
             .select('id')
@@ -162,16 +160,15 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             .single();
 
         if (fetchError || !docToRename) {
-            throw new Error("Original document not found or you don't have permission to edit it.");
+            throw new Error("Document not found or you don't have permission to rename it.");
         }
         
-        // Step 2: Check if a document with the new name already exists for this user
         const { data: existing, error: existingError } = await supabase
             .from('documents')
             .select('id')
             .eq('user_id', user.id)
             .eq('source_file', newName)
-            .neq('id', documentId) // Exclude the current document from the check
+            .neq('id', documentId) 
             .limit(1);
 
         if (existingError) {
@@ -182,18 +179,14 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error(`A document with the name "${newName}" already exists.`);
         }
 
-        // Step 3: Perform the update
         const { data: updatedDoc, error: updateError } = await supabase
             .from('documents')
             .update({ source_file: newName })
-            .eq('id', documentId) // We know this ID is valid and owned by the user
+            .eq('id', documentId)
             .select()
-            .single(); // Since we verified it exists, .single() is now safe.
+            .single(); 
         
         if (updateError) {
-            if (updateError.message.includes('unique constraint')) {
-                throw new Error(`A document with the name "${newName}" already exists.`);
-            }
             throw new Error(`Failed to rename document: ${updateError.message}`);
         }
         
@@ -287,6 +280,10 @@ export async function batchSolveQuestionsAction(
                 throw new Error(`Failed to fetch original questions for update: ${fetchError.message}`);
             }
 
+            if (!originalQuestions || originalQuestions.length === 0) {
+                throw new Error("Could not find the original questions to update. They may have been deleted or you may not have permission to access them.");
+            }
+
             const updates = originalQuestions.map(originalQ => {
                 const solvedData = solvedQuestionMap.get(originalQ.id);
                 if (!solvedData) return null;
@@ -330,7 +327,6 @@ export async function getTopicBenchmarkAction({ topic }: { topic: string }): Pro
     );
 
     try {
-        // RLS is not required here as we are fetching aggregate, anonymized data.
         const { data, error } = await supabase.rpc('get_topic_benchmark', { topic_text: topic }).single();
 
         if (error) {
@@ -342,5 +338,59 @@ export async function getTopicBenchmarkAction({ topic }: { topic: string }): Pro
     } catch (error: any) {
         console.error('Error getting topic benchmark:', error);
         return { error: error.message || 'Failed to get topic benchmark. Please try again.' };
+    }
+}
+
+
+export async function getWrongAnswerExplanationAction(input: Omit<GetWrongAnswerExplanationInput, 'apiKey'>): Promise<GetWrongAnswerExplanationOutput | { error: string }> {
+    try {
+        const apiKey = await getApiKey();
+        const result = await getWrongAnswerExplanation({ ...input, apiKey });
+        return result;
+    } catch (error: any) {
+        console.error('Error getting wrong answer explanation:', error);
+        return { error: error.message || 'Failed to generate explanation. Please try again.' };
+    }
+}
+
+
+export async function generateRevisionPlanAction(): Promise<GenerateRevisionPlanOutput | { error: string }> {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: { get: (name: string) => cookieStore.get(name)?.value },
+        }
+    );
+
+    try {
+         const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error("Authentication error.");
+        }
+        
+        const { data: performanceData, error: rpcError } = await supabase.rpc('get_topic_performance');
+
+        if (rpcError) {
+            throw new Error(`Failed to fetch performance data: ${rpcError.message}`);
+        }
+
+        if (!performanceData || performanceData.length === 0) {
+            return { error: "Not enough performance data to generate a plan. Please take more tests." };
+        }
+
+        const formattedPerformance = performanceData.map((d: any) => ({
+            topic: d.topic,
+            accuracy: d.accuracy,
+        }));
+        
+        const apiKey = await getApiKey();
+        const result = await generateRevisionPlan({ performanceData: formattedPerformance, apiKey });
+        return result;
+
+    } catch (error: any) {
+        console.error('Error generating revision plan:', error);
+        return { error: error.message || 'Failed to generate revision plan. Please try again.' };
     }
 }

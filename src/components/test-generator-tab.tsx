@@ -7,10 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock, Users } from 'lucide-react';
+import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock, Users, Lightbulb } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { batchSolveQuestionsAction, generateTestFeedbackAction, getTopicBenchmarkAction } from '@/app/actions';
+import { batchSolveQuestionsAction, generateTestFeedbackAction, getTopicBenchmarkAction, getWrongAnswerExplanationAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from '@/components/ui/progress';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
@@ -20,10 +20,64 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { cn, normalizeOption } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { createClient } from '@/lib/supabase';
 
+function WhyWrongDialog({ question, userAnswer }: { question: Question, userAnswer: string }) {
+    const [explanation, setExplanation] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { toast } = useToast();
 
-type TestStatus = 'configuring' | 'in-progress' | 'finishing' | 'results';
-const difficultyOptions: Question['difficulty'][] = ['Easy', 'Medium', 'Hard'];
+    const handleFetchExplanation = async () => {
+        setIsLoading(true);
+        setExplanation('');
+        const result = await getWrongAnswerExplanationAction({
+            questionText: question.text,
+            options: question.options,
+            correctOption: question.correct_option || undefined,
+            userSelectedOption: userAnswer
+        });
+
+        if ('error' in result) {
+            toast({ variant: 'destructive', title: 'Error', description: result.error });
+        } else {
+            setExplanation(result.explanation);
+        }
+        setIsLoading(false);
+    };
+
+    return (
+        <Dialog onOpenChange={(open) => { if (open) { handleFetchExplanation(); }}}>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 h-auto py-1 px-2 text-xs">
+                    <Lightbulb className="h-3 w-3" />
+                    Why was this wrong?
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Analyzing Your Answer</DialogTitle>
+                    <DialogDescription>Let's break down why your answer might not be correct.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                     <div>
+                        <p className="font-semibold text-sm">Your Answer</p>
+                        <p className="text-sm p-2 bg-red-100/50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-md mt-1">{userAnswer}</p>
+                    </div>
+                     <div>
+                        <p className="font-semibold text-sm">Explanation</p>
+                        <div className="text-sm p-2 bg-muted rounded-md mt-1 min-h-[6rem]">
+                           {isLoading && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /><span>Thinking...</span></div>}
+                           {explanation && <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{explanation}</ReactMarkdown>}
+                        </div>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 
 function TestResults({
   testResult,
@@ -154,31 +208,40 @@ function TestResults({
       <div>
         <h3 className="text-xl font-semibold mb-4">Review Your Answers</h3>
         <div className="space-y-4">
-          {test.map((q, index) => (
-            <Card key={q.id}>
-              <CardContent className="p-6">
-                  <p className="font-semibold mb-2">{index + 1}. {q.text}</p>
-                  <div className="space-y-2">
-                      {q.options?.map((option, i) => {
-                          const isCorrect = normalizeOption(q.correct_option || '') === normalizeOption(option);
-                          const isUserAnswer = normalizeOption(userAnswers[q.id] || '') === normalizeOption(option);
-                          return (
-                              <div key={i} className={cn("flex items-center gap-3 p-2 rounded-md", isCorrect ? "bg-green-100 dark:bg-green-900/30" : isUserAnswer ? "bg-red-100 dark:bg-red-900/30" : "")}>
-                                  {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : isUserAnswer ? <XCircle className="h-5 w-5 text-red-600" /> : <div className="h-5 w-5 shrink-0" />}
-                                  <span className={cn(isCorrect && "font-bold")}>{option}</span>
-                              </div>
-                          )
-                      })}
-                  </div>
-                  {q.solution && (
-                    <div className="mt-4 p-4 bg-muted/50 rounded-md">
-                        <h4 className="font-semibold mb-2 text-sm">Explanation:</h4>
-                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{q.solution}</ReactMarkdown>
+          {test.map((q, index) => {
+            const userAnswer = userAnswers[q.id];
+            const isCorrect = normalizeOption(userAnswer || '') === normalizeOption(q.correct_option || '');
+            return (
+                <Card key={q.id}>
+                <CardContent className="p-6">
+                    <p className="font-semibold mb-4">{index + 1}. {q.text}</p>
+                    <div className="space-y-2">
+                        {q.options?.map((option, i) => {
+                            const isCorrectOption = normalizeOption(q.correct_option || '') === normalizeOption(option);
+                            const isUserAnswer = normalizeOption(userAnswer || '') === normalizeOption(option);
+                            return (
+                                <div key={i} className={cn("flex items-center gap-3 p-2 rounded-md", isCorrectOption ? "bg-green-100 dark:bg-green-900/30" : isUserAnswer ? "bg-red-100 dark:bg-red-900/30" : "")}>
+                                    {isCorrectOption ? <CheckCircle className="h-5 w-5 text-green-600" /> : isUserAnswer ? <XCircle className="h-5 w-5 text-red-600" /> : <div className="h-5 w-5 shrink-0" />}
+                                    <span className={cn(isCorrectOption && "font-bold")}>{option}</span>
+                                </div>
+                            )
+                        })}
                     </div>
-                  )}
-              </CardContent>
-            </Card>
-          ))}
+                    {!isCorrect && userAnswer && (
+                        <div className="mt-4 text-right">
+                           <WhyWrongDialog question={q} userAnswer={userAnswer} />
+                        </div>
+                    )}
+                    {q.solution && (
+                        <div className="mt-4 p-4 bg-muted/50 rounded-md">
+                            <h4 className="font-semibold mb-2 text-sm">Explanation:</h4>
+                            <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none" remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{q.solution}</ReactMarkdown>
+                        </div>
+                    )}
+                </CardContent>
+                </Card>
+            )
+          })}
         </div>
       </div>
     </div>
@@ -192,16 +255,18 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   const [sourceFileFilter, setSourceFileFilter] = useState<string[]>([]);
   const [numQuestions, setNumQuestions] = useState(10);
   const [timePerQuestion, setTimePerQuestion] = useState(60); // In seconds
+  const [isAdaptive, setIsAdaptive] = useState(false);
   
   const [status, setStatus] = useState<TestStatus>('configuring');
   const [generatedTest, setGeneratedTest] = useState<Question[]>([]);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [isGeneratingSolutions, setIsGeneratingSolutions] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [completedTest, setCompletedTest] = useState<TestResult | null>(null);
 
   const { toast } = useToast();
+  const supabase = useMemo(() => createClient(), []);
 
   const handleFinishTest = useCallback(async () => {
       setStatus('finishing');
@@ -225,7 +290,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
         date: new Date().toISOString(),
         questions: generatedTest,
         userAnswers,
-        feedback: null, // Initially null
+        feedback: null, 
         score,
         total: generatedTest.length,
       };
@@ -233,7 +298,6 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
       setCompletedTest(testResult);
       setStatus('results');
 
-      // Generate feedback in the background and save the test
       const feedbackResult = await generateTestFeedbackAction({ results: resultsForFeedback });
       
       if (!('error' in feedbackResult)) {
@@ -280,12 +344,42 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   }, [questions]);
 
   const handleGenerateTest = async () => {
-    const filtered = testableQuestions.filter(q => {
+    setIsGenerating(true);
+    let filtered = testableQuestions.filter(q => {
       const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
       const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile!);
       return topicMatch && difficultyMatch && sourceFileMatch;
     });
+
+    if (isAdaptive) {
+        toast({ title: "Adaptive Test", description: "Analyzing your performance to find weak spots..." });
+        const { data: performanceData, error } = await supabase.rpc('get_topic_performance');
+        if (error || !performanceData) {
+            toast({ variant: "destructive", title: "Could not get performance data.", description: "Switching to standard test." });
+        } else {
+            const weakTopics = performanceData.filter((p: any) => p.accuracy < 60).sort((a: any, b: any) => a.accuracy - b.accuracy).map((p: any) => p.topic);
+            
+            if (weakTopics.length > 0) {
+                const weakQuestions = filtered.filter(q => weakTopics.includes(q.topic));
+                const otherQuestions = filtered.filter(q => !weakTopics.includes(q.topic));
+
+                const numWeak = Math.min(weakQuestions.length, Math.ceil(numQuestions * 0.7));
+                const numOther = numQuestions - numWeak;
+
+                const finalTestQuestions = [
+                    ...weakQuestions.sort(() => 0.5 - Math.random()).slice(0, numWeak),
+                    ...otherQuestions.sort(() => 0.5 - Math.random()).slice(0, numOther)
+                ];
+
+                if (finalTestQuestions.length >= numQuestions) {
+                    filtered = finalTestQuestions;
+                    toast({ title: "Adaptive test ready!", description: `Focusing on your weak areas: ${weakTopics.slice(0,3).join(', ')}.`});
+                }
+            }
+        }
+    }
+
 
     if (filtered.length < numQuestions) {
         toast({
@@ -293,6 +387,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
             title: "Not Enough Questions",
             description: `Found only ${filtered.length} questions matching your criteria. Please broaden your search or reduce the number of questions.`,
         });
+        setIsGenerating(false);
         return;
     }
 
@@ -302,7 +397,6 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
     const questionsToSolve = test.filter(q => !q.solution);
 
     if (questionsToSolve.length > 0) {
-        setIsGeneratingSolutions(true);
         toast({
             title: "Preparing Your Test...",
             description: `Generating solutions for ${questionsToSolve.length} question(s). This may take a moment.`,
@@ -315,14 +409,14 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
         }));
 
         const result = await batchSolveQuestionsAction({ questions: questionsForAI });
-        setIsGeneratingSolutions(false);
-
+        
         if ('error' in result) {
             toast({
                 variant: "destructive",
                 title: "Failed to Prepare Test",
                 description: result.error,
             });
+            setIsGenerating(false);
             return;
         }
         
@@ -349,6 +443,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
     } else {
         startTest(test);
     }
+    setIsGenerating(false);
   };
   
   const startTest = (test: Question[]) => {
@@ -447,87 +542,96 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
         <CardTitle>Create a Mock Test</CardTitle>
         <CardDescription>Set your criteria and generate a custom practice test.</CardDescription>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-        <div className="space-y-2 col-span-full">
-            <Label>Available Questions for Test</Label>
-            <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{testableQuestions.length}</span> questions are available. Tests are created from multiple-choice questions. Solutions will be generated on-the-fly if needed.</p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="test-topic">Topic</Label>
-          <Select value={topicFilter} onValueChange={setTopicFilter}>
-            <SelectTrigger id="test-topic"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {availableTopics.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="test-difficulty">Difficulty</Label>
-          <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-            <SelectTrigger id="test-difficulty"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">Any Difficulty</SelectItem>
-              {difficultyOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="test-num-questions">Number of Questions</Label>
-          <Input
-            id="test-num-questions"
-            type="number"
-            value={numQuestions}
-            onChange={e => setNumQuestions(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            min="1"
-            max={testableQuestions.length}
-          />
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="test-time">Time per Question</Label>
-            <Select value={String(timePerQuestion)} onValueChange={(v) => setTimePerQuestion(Number(v))}>
-              <SelectTrigger id="test-time"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                  <SelectItem value="30">30 seconds</SelectItem>
-                  <SelectItem value="60">1 minute</SelectItem>
-                  <SelectItem value="120">2 minutes</SelectItem>
-                  <SelectItem value="300">5 minutes</SelectItem>
-              </SelectContent>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            <div className="space-y-2 col-span-full">
+                <Label>Available Questions for Test</Label>
+                <p className="text-sm text-muted-foreground"><span className="font-bold text-foreground">{testableQuestions.length}</span> questions are available. Tests are created from multiple-choice questions. Solutions will be generated on-the-fly if needed.</p>
+            </div>
+            <div className="space-y-2">
+            <Label htmlFor="test-topic">Topic</Label>
+            <Select value={topicFilter} onValueChange={setTopicFilter}>
+                <SelectTrigger id="test-topic"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                {availableTopics.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                </SelectContent>
             </Select>
+            </div>
+            <div className="space-y-2">
+            <Label htmlFor="test-difficulty">Difficulty</Label>
+            <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                <SelectTrigger id="test-difficulty"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                <SelectItem value="All">Any Difficulty</SelectItem>
+                {difficultyOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label htmlFor="test-num-questions">Number of Questions</Label>
+            <Input
+                id="test-num-questions"
+                type="number"
+                value={numQuestions}
+                onChange={e => setNumQuestions(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                min="1"
+                max={testableQuestions.length}
+            />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="test-time">Time per Question</Label>
+                <Select value={String(timePerQuestion)} onValueChange={(v) => setTimePerQuestion(Number(v))}>
+                <SelectTrigger id="test-time"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="30">30 seconds</SelectItem>
+                    <SelectItem value="60">1 minute</SelectItem>
+                    <SelectItem value="120">2 minutes</SelectItem>
+                    <SelectItem value="300">5 minutes</SelectItem>
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2 col-span-full">
+                <Label htmlFor="source-filter">Source PDF(s)</Label>
+                <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between text-left font-normal">
+                    <span className="truncate">
+                        {sourceFileFilter.length === 0 ? 'All Sources' : sourceFileFilter.length === 1 ? sourceFileFilter[0] : `${sourceFileFilter.length} sources selected`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 ml-2 opacity-50 shrink-0" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                    <DropdownMenuLabel>Filter by Source File</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {sourceFiles.map(file => (
+                        <DropdownMenuCheckboxItem
+                            key={file}
+                            checked={sourceFileFilter.includes(file!)}
+                            onCheckedChange={checked => {
+                                setSourceFileFilter(prev => 
+                                    checked ? [...prev, file!] : prev.filter(f => f !== file)
+                                )
+                            }}
+                        >
+                            {file}
+                        </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
-        <div className="space-y-2 col-span-full">
-            <Label htmlFor="source-filter">Source PDF(s)</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full justify-between text-left font-normal">
-                   <span className="truncate">
-                    {sourceFileFilter.length === 0 ? 'All Sources' : sourceFileFilter.length === 1 ? sourceFileFilter[0] : `${sourceFileFilter.length} sources selected`}
-                   </span>
-                  <ChevronDown className="h-4 w-4 ml-2 opacity-50 shrink-0" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                <DropdownMenuLabel>Filter by Source File</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {sourceFiles.map(file => (
-                    <DropdownMenuCheckboxItem
-                        key={file}
-                        checked={sourceFileFilter.includes(file!)}
-                        onCheckedChange={checked => {
-                            setSourceFileFilter(prev => 
-                                checked ? [...prev, file!] : prev.filter(f => f !== file)
-                            )
-                        }}
-                    >
-                        {file}
-                    </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+        <div className="flex items-center space-x-2 pt-6">
+            <Switch id="adaptive-mode" checked={isAdaptive} onCheckedChange={setIsAdaptive} />
+            <Label htmlFor="adaptive-mode" className="flex flex-col">
+              <span>Focus on Weak Topics (Adaptive)</span>
+              <span className="font-normal text-muted-foreground text-xs">AI will build a test targeting your areas for improvement.</span>
+            </Label>
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={handleGenerateTest} className="w-full" disabled={testableQuestions.length === 0 || isGeneratingSolutions}>
-          {isGeneratingSolutions ? (
+        <Button onClick={handleGenerateTest} className="w-full" disabled={testableQuestions.length === 0 || isGenerating}>
+          {isGenerating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Preparing Test...
