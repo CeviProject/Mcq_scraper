@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { createClient } from '@/lib/supabase';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
 
 // Create client once outside the component.
 // This can throw if env vars are missing, so we'll handle it.
@@ -20,7 +21,22 @@ try {
 }
 
 export default function LoginForm() {
+    const router = useRouter();
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+    useEffect(() => {
+        if (!supabase) return;
+        
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_IN') {
+                router.refresh();
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [router, supabase]);
 
     if (configError) {
         return (
