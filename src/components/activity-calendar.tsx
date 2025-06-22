@@ -90,7 +90,7 @@ const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ data, title = "Acti
                       {weeks.map((week, i) => (
                         <div key={i} className="flex flex-col gap-1">
                           {week.map((day, j) => {
-                            if (!day) return <div key={j} className="h-2.5 w-2.5 rounded-sm bg-secondary/60" />;
+                            if (!day) return <div key={j} className="h-2.5 w-2.5 rounded-sm bg-transparent" />;
                             
                             const dateKey = format(day, 'yyyy-MM-dd');
                             const count = dateCounts.get(dateKey) || 0;

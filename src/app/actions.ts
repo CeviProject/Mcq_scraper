@@ -200,18 +200,21 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error(`A document with the name "${newName}" already exists.`);
         }
 
-        const { data: updatedDoc, error: updateError } = await supabase
+        const { data: updatedDocs, error: updateError } = await supabase
             .from('documents')
             .update({ source_file: newName })
             .eq('id', documentId)
-            .select()
-            .single(); 
+            .select();
         
         if (updateError) {
             throw new Error(`Failed to rename document: ${updateError.message}`);
         }
         
-        return { updatedDocument: updatedDoc as Document };
+        if (!updatedDocs || updatedDocs.length === 0) {
+             throw new Error("Failed to rename document or retrieve the updated record.");
+        }
+
+        return { updatedDocument: updatedDocs[0] as Document };
 
     } catch (error: any) {
         console.error('Error renaming document:', error);
