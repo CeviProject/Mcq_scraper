@@ -32,6 +32,7 @@ export type Question = {
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Not Set';
   solution: string | null;
   correct_option: string | null;
+  is_bookmarked: boolean;
   sourceFile?: string; // This will be joined from the documents table
 };
 

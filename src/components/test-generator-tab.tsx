@@ -7,13 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock } from 'lucide-react';
+import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { batchSolveQuestionsAction, generateTestFeedbackAction } from '@/app/actions';
+import { batchSolveQuestionsAction, generateTestFeedbackAction, getTopicBenchmarkAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from '@/components/ui/progress';
-import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -33,6 +33,8 @@ function TestResults({
   onRestart: () => void;
 }) {
   const { score, total, feedback, questions: test, userAnswers } = testResult;
+  const [benchmarks, setBenchmarks] = useState<Record<string, number>>({});
+  const [isFetchingBenchmarks, setIsFetchingBenchmarks] = useState(true);
 
   const performanceByTopic = useMemo(() => {
     const performance: Record<string, { correct: number; total: number }> = {};
@@ -47,15 +49,43 @@ function TestResults({
       performance[topic].total++;
       if (isCorrect) performance[topic].correct++;
     });
-
-    const chartData = Object.entries(performance).map(([topic, data]) => ({
+    
+    return Object.entries(performance).map(([topic, data]) => ({
         name: topic,
-        Correct: data.correct,
-        Incorrect: data.total - data.correct,
+        accuracy: parseFloat(((data.correct / data.total) * 100).toFixed(1)),
     }));
-
-    return chartData;
   }, [test, userAnswers]);
+
+  useEffect(() => {
+    const fetchBenchmarks = async () => {
+        setIsFetchingBenchmarks(true);
+        const topics = performanceByTopic.map(p => p.name);
+        const benchmarkPromises = topics.map(topic => getTopicBenchmarkAction({ topic }));
+        const results = await Promise.all(benchmarkPromises);
+        
+        const newBenchmarks: Record<string, number> = {};
+        results.forEach((res, index) => {
+            if (!('error' in res)) {
+                newBenchmarks[topics[index]] = parseFloat(res.benchmark.toFixed(1));
+            }
+        });
+
+        setBenchmarks(newBenchmarks);
+        setIsFetchingBenchmarks(false);
+    }
+    if (performanceByTopic.length > 0) {
+        fetchBenchmarks();
+    }
+  }, [performanceByTopic]);
+
+  const chartData = useMemo(() => {
+    return performanceByTopic.map(p => ({
+        name: p.name,
+        'Your Accuracy': p.accuracy,
+        'Peer Average': benchmarks[p.name] || 0,
+    }));
+  }, [performanceByTopic, benchmarks]);
+
 
   return (
     <div className="space-y-6">
@@ -69,17 +99,30 @@ function TestResults({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base"><BarChart className="h-5 w-5"/>Performance by Topic</CardTitle>
+                     <CardDescription className="flex items-center gap-1.5 text-xs"><Users className="h-3 w-3" /> Compare your results with the peer average.</CardDescription>
                 </CardHeader>
                 <CardContent className="h-60">
+                   {isFetchingBenchmarks && chartData.length > 0 ? (
+                       <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
+                           <Loader2 className="h-4 w-4 animate-spin" />
+                           <span>Fetching peer data...</span>
+                       </div>
+                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                        <RechartsBarChart data={performanceByTopic} layout="vertical" margin={{ left: 20, right: 20 }}>
-                            <XAxis type="number" hide />
+                        <RechartsBarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                            <XAxis type="number" hide domain={[0, 100]}/>
                             <YAxis dataKey="name" type="category" width={80} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                            <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}/>
-                            <Bar dataKey="Correct" stackId="a" fill="hsl(var(--primary))" radius={[4, 4, 4, 4]} />
-                            <Bar dataKey="Incorrect" stackId="a" fill="hsl(var(--destructive) / 0.3)" radius={[4, 4, 4, 4]} />
+                            <Tooltip 
+                                cursor={{fill: 'hsl(var(--muted))'}} 
+                                contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}
+                                formatter={(value) => `${value}%`}
+                            />
+                            <Legend wrapperStyle={{fontSize: '0.8rem', paddingTop: '10px'}}/>
+                            <Bar dataKey="Your Accuracy" fill="hsl(var(--primary))" radius={[4, 4, 4, 4]} barSize={12} />
+                            <Bar dataKey="Peer Average" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 4, 4]} barSize={12}/>
                         </RechartsBarChart>
                     </ResponsiveContainer>
+                   )}
                 </CardContent>
             </Card>
             <Card>
@@ -455,9 +498,11 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
             <Label htmlFor="source-filter">Source PDF(s)</Label>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full justify-between">
-                  {sourceFileFilter.length === 0 ? 'All Sources' : sourceFileFilter.length === 1 ? sourceFileFilter[0] : `${sourceFileFilter.length} sources selected`}
-                  <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                <Button variant="outline" className="w-full justify-between text-left font-normal">
+                   <span className="truncate">
+                    {sourceFileFilter.length === 0 ? 'All Sources' : sourceFileFilter.length === 1 ? sourceFileFilter[0] : `${sourceFileFilter.length} sources selected`}
+                   </span>
+                  <ChevronDown className="h-4 w-4 ml-2 opacity-50 shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">

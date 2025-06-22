@@ -84,7 +84,25 @@ This document provides an overview of the key features of the Aptitude Ace appli
 
 ---
 
-## 5. Mock Test Generator
+## 5. Bookmark & Revisit Questions
+
+### Features
+- Mark questions as "important" or "review later" with a bookmark button.
+- A dedicated "Review" tab in the main interface shows all bookmarked questions.
+
+### API Calls & Logic
+-   **Database Setup**: This feature requires a schema change. You must add a new boolean column to your `questions` table.
+    -   Run this SQL in your Supabase SQL Editor:
+    ```sql
+    ALTER TABLE public.questions
+    ADD COLUMN is_bookmarked BOOLEAN DEFAULT FALSE;
+    ```
+-   **`src/components/question-item.tsx`**: A bookmark button on the question card calls the `onQuestionUpdate` function to toggle the `is_bookmarked` field in the database.
+-   **`src/components/review-tab.tsx`**: This new component filters the full list of questions to show only those where `is_bookmarked` is `true`.
+
+---
+
+## 6. Mock Test Generator
 
 ### Features
 -   Create custom mock tests based on filters (topic, difficulty, source PDF).
@@ -107,15 +125,38 @@ This document provides an overview of the key features of the Aptitude Ace appli
 
 ---
 
-## 6. Dashboard & Analytics
+## 7. Dashboard, Analytics & Peer Comparison
 
 ### Features
 -   An overview of key stats: uploaded PDFs, total questions, tests taken, and average score.
 -   A GitHub-style activity calendar showing test frequency over the last year.
 -   A bar chart showing your top-performing topics based on accuracy in tests.
+-   **Peer Benchmarking**: Compare your topic accuracy against the anonymized average of all other users on the test results page.
 -   A table of your most recent test results.
 
 ### API Calls & Logic
 -   **Database RPC**: `get_topic_performance` (`src/components/dashboard-tab.tsx`)
     -   The dashboard calls a Supabase Remote Procedure Call (RPC) named `get_topic_performance`. This is a custom SQL function defined in the database that calculates the accuracy percentage for each topic across all of a user's test attempts.
+-   **Database RPC (New)**: `get_topic_benchmark` (`src/components/test-generator-tab.tsx`)
+    -   **Setup**: This feature requires creating a new SQL function in your Supabase database. Run this in your SQL Editor:
+    ```sql
+    CREATE OR REPLACE FUNCTION get_topic_benchmark(topic_text TEXT)
+    RETURNS TABLE(global_accuracy REAL) AS $$
+    BEGIN
+        RETURN QUERY
+        SELECT
+            CASE
+                WHEN COUNT(*) = 0 THEN 0
+                ELSE (SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) * 100.0) / COUNT(*)
+            END
+        FROM
+            public.test_attempts ta
+        JOIN
+            public.questions q ON ta.question_id = q.id
+        WHERE
+            q.topic = topic_text;
+    END;
+    $$ LANGUAGE plpgsql;
+    ```
+    -   **Server Action**: `getTopicBenchmarkAction` is called from the test results page for each topic. It calls the `get_topic_benchmark` RPC to fetch the global average accuracy for that topic.
 -   **Database Queries**: The dashboard fetches all data from the `tests` and `documents` tables (filtered by user) to calculate stats and populate the activity calendar and recent tests table.

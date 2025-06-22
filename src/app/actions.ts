@@ -77,6 +77,7 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
             text: q.questionText,
             options: q.options,
             topic: q.topic || 'Uncategorized',
+            is_bookmarked: false,
           }));
 
         if (questionsToInsert.length > 0) {
@@ -114,7 +115,7 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
         }
 
         // With ON DELETE CASCADE enabled in the database, we only need to delete the parent document.
-        // The database will automatically handle deleting all associated questions and test attempts.
+        // The database will automatically handle deleting all related questions and test attempts.
         const { error: documentError } = await supabase
             .from('documents')
             .delete()
@@ -315,5 +316,31 @@ export async function batchSolveQuestionsAction(
     } catch (error: any) {
         console.error('Error batch solving questions:', error);
         return { error: error.message || 'Failed to generate solutions for the test. Please try again.' };
+    }
+}
+
+export async function getTopicBenchmarkAction({ topic }: { topic: string }): Promise<{ benchmark: number } | { error: string }> {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: { get: (name: string) => cookieStore.get(name)?.value },
+        }
+    );
+
+    try {
+        // RLS is not required here as we are fetching aggregate, anonymized data.
+        const { data, error } = await supabase.rpc('get_topic_benchmark', { topic_text: topic }).single();
+
+        if (error) {
+            throw new Error(`Failed to fetch topic benchmark: ${error.message}`);
+        }
+        
+        return { benchmark: data.global_accuracy || 0 };
+
+    } catch (error: any) {
+        console.error('Error getting topic benchmark:', error);
+        return { error: error.message || 'Failed to get topic benchmark. Please try again.' };
     }
 }

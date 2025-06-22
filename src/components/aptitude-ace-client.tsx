@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2 } from 'lucide-react';
+import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2, Bookmark } from 'lucide-react';
 import { Document, Question, TestResult, ChatMessage, Test, Profile } from '@/lib/types';
 import { segregateContentAction, deleteDocumentAction, renameDocumentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +12,7 @@ import UploadTab from './upload-tab';
 import TheoryZoneTab from './theory-zone-tab';
 import QuestionBankTab from './question-bank-tab';
 import TestGeneratorTab from './test-generator-tab';
+import ReviewTab from './review-tab';
 import SettingsSheet from './settings-sheet';
 import { createClient } from '@/lib/supabase';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
@@ -201,7 +202,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
         setQuestions(prev => prev.filter(q => q.document_id !== documentId));
         toast({ title: 'Document Deleted', description: 'The document and its questions have been removed.' });
     }
-  }, [session, toast, supabase]);
+  }, [session, toast]);
 
  const handleDocumentRename = useCallback(async (documentId: string, newName: string) => {
     if (!session) {
@@ -218,19 +219,23 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
         setQuestions(prev => prev.map(q => q.document_id === documentId ? { ...q, sourceFile: updatedDocument.source_file } : q));
         toast({ title: 'Document Renamed' });
     }
-  }, [session, toast, supabase]);
+  }, [session, toast]);
 
 
   const handleQuestionUpdate = useCallback(async (updatedQuestion: Partial<Question> & { id: string }) => {
     const { id, ...updateData } = updatedQuestion;
+    
+    // Optimistically update UI
+    setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...updateData } : q));
+
     const { error } = await supabase.from('questions').update(updateData).eq('id', id);
 
     if (error) {
         toast({ variant: 'destructive', title: 'Error updating question', description: error.message });
-    } else {
-        setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...updateData } : q));
+        // Revert UI on error
+        setQuestions(prev => prev.map(q => q.id === id ? { ...q, ...questions.find(oq => oq.id === id) } : q));
     }
-  }, [toast, supabase]);
+  }, [toast, supabase, questions]);
   
   const handleQuestionsUpdate = useCallback((updates: (Partial<Question> & { id: string })[]) => {
     const updatesMap = new Map(updates.map(u => [u.id, u]));
@@ -240,6 +245,8 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
   const handleProfileUpdate = (newProfile: Profile) => {
     setProfile(newProfile);
   };
+
+  const bookmarkedQuestions = useMemo(() => questions.filter(q => q.is_bookmarked), [questions]);
   
   if (isLoading) {
     return (
@@ -266,11 +273,12 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
       </header>
       <div className="container mx-auto p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto">
             <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</TabsTrigger>
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Upload</TabsTrigger>
             <TabsTrigger value="theory" className="gap-2" disabled={documents.length === 0}><BookOpen className="h-4 w-4" />Theory Zone</TabsTrigger>
             <TabsTrigger value="questions" className="gap-2" disabled={questions.length === 0}><ListChecks className="h-4 w-4" />Question Bank</TabsTrigger>
+            <TabsTrigger value="review" className="gap-2" disabled={bookmarkedQuestions.length === 0}><Bookmark className="h-4 w-4" />Review</TabsTrigger>
             <TabsTrigger value="test-generator" className="gap-2" disabled={questions.length === 0}><FileText className="h-4 w-4" />Test Generator</TabsTrigger>
           </TabsList>
 
@@ -294,6 +302,15 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
           <TabsContent value="questions" className="mt-6">
             <QuestionBankTab 
                 questions={questions} 
+                onQuestionUpdate={handleQuestionUpdate} 
+                documents={documents}
+                questionUiState={questionUiState}
+                setQuestionUiState={setQuestionUiState}
+            />
+          </TabsContent>
+           <TabsContent value="review" className="mt-6">
+            <ReviewTab 
+                questions={bookmarkedQuestions} 
                 onQuestionUpdate={handleQuestionUpdate} 
                 documents={documents}
                 questionUiState={questionUiState}
