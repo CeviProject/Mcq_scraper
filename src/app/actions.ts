@@ -189,13 +189,11 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error(`A document with the name "${newName}" already exists.`);
         }
 
-        const { data: updatedDoc, error: updateError } = await supabase
+        const { error: updateError } = await supabase
             .from('documents')
             .update({ source_file: newName })
             .eq('id', documentId)
-            .eq('user_id', user.id)
-            .select()
-            .single();
+            .eq('user_id', user.id);
         
         if (updateError) {
             if (updateError.message.includes('violates row-level security policy')) {
@@ -204,8 +202,14 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error(`Failed to rename document: ${updateError.message}`);
         }
         
-        if (!updatedDoc) {
-             throw new Error("Failed to rename document or retrieve the updated record.");
+        const { data: updatedDoc, error: selectError } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('id', documentId)
+            .single();
+
+        if (selectError || !updatedDoc) {
+             throw new Error("Failed to retrieve the updated record after renaming.");
         }
 
         return { updatedDocument: updatedDoc as Document };
