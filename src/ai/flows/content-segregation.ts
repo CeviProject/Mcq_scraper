@@ -17,14 +17,14 @@ const ContentSegregationInputSchema = z.object({
   pdfDataUri: z
     .string()
     .describe(
-      "A PDF document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "A PDF document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
   apiKey: z.string().optional().describe("User's Gemini API key."),
 });
 export type ContentSegregationInput = z.infer<typeof ContentSegregationInputSchema>;
 
 const SegregatedQuestionSchema = z.object({
-  questionText: z.string().describe("The full, complete text of the question, without the question number."),
+  questionText: z.string().describe("The full, complete text of the question, without the question number or the multiple-choice options."),
   options: z.array(z.string()).optional().describe("An array of multiple-choice options for the question. For example, ['(A) 10', '(B) 20', '(C) 30', '(D) 40']. Extract the full option text including the letter/number."),
   topic: z.string().describe("A concise topic for the question (e.g., 'Percentages', 'Time and Work', 'Geometry').")
 });
@@ -77,7 +77,7 @@ Your goal is to be exhaustive. **Assume everything in the document is either the
     *   Return this well-structured content as a single Markdown string. Be thorough and ensure no theoretical content is missed.
 
 2.  **Extract Questions**: Identify and extract all individual questions, problems, and exercises. For each question:
-    - Extract the full question text. Do not include the question number (e.g., "1.", "Q2.").
+    - Extract the full question text. The 'questionText' should NOT include the question number (e.g., "1.", "Q2.") OR the list of multiple-choice options. The options should only be in the 'options' field.
     - If the question has multiple-choice options, extract them into an array of strings. Include the option label (e.g., "(A)", "1)") as part of the string.
     - Based on the question's content, determine its specific topic (e.g., 'Percentages', 'Time and Work', 'Geometry').
     - If there are no options, do not include the 'options' field.

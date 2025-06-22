@@ -149,7 +149,7 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
                         <ResponsiveContainer width="100%" height="100%">
                             <RechartsBarChart data={topicPerformance.slice(0, 5)} layout="vertical" margin={{ left: 20, right: 20 }}>
                                 <XAxis type="number" domain={[0, 100]} hide />
-                                <YAxis dataKey="name" type="category" width={80} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                                <YAxis dataKey="name" type="category" width={120} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
                                 <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} formatter={(value) => `${value}%`} />
                                 <Bar dataKey="Accuracy" radius={[4, 4, 4, 4]} barSize={20}>
                                     {topicPerformance.slice(0, 5).map((entry, index) => (

@@ -167,7 +167,7 @@ function TestResults({
                     <ResponsiveContainer width="100%" height="100%">
                         <RechartsBarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                             <XAxis type="number" hide domain={[0, 100]}/>
-                            <YAxis dataKey="name" type="category" width={80} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                            <YAxis dataKey="name" type="category" width={120} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
                             <Tooltip 
                                 cursor={{fill: 'hsl(var(--muted))'}} 
                                 contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}
