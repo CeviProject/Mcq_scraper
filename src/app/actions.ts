@@ -173,17 +173,6 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error("Authentication error.");
         }
 
-        const { data: docToRename, error: fetchError } = await supabase
-            .from('documents')
-            .select('id')
-            .eq('id', documentId)
-            .eq('user_id', user.id)
-            .single();
-
-        if (fetchError || !docToRename) {
-            throw new Error("Document not found or you don't have permission to rename it.");
-        }
-        
         const { data: existing, error: existingError } = await supabase
             .from('documents')
             .select('id')
@@ -200,21 +189,26 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             throw new Error(`A document with the name "${newName}" already exists.`);
         }
 
-        const { data: updatedDocs, error: updateError } = await supabase
+        const { data: updatedDoc, error: updateError } = await supabase
             .from('documents')
             .update({ source_file: newName })
             .eq('id', documentId)
-            .select();
+            .eq('user_id', user.id)
+            .select()
+            .single();
         
         if (updateError) {
+            if (updateError.message.includes('violates row-level security policy')) {
+                throw new Error("Database security error: You do not have permission to rename this document.");
+            }
             throw new Error(`Failed to rename document: ${updateError.message}`);
         }
         
-        if (!updatedDocs || updatedDocs.length === 0) {
+        if (!updatedDoc) {
              throw new Error("Failed to rename document or retrieve the updated record.");
         }
 
-        return { updatedDocument: updatedDocs[0] as Document };
+        return { updatedDocument: updatedDoc as Document };
 
     } catch (error: any) {
         console.error('Error renaming document:', error);
