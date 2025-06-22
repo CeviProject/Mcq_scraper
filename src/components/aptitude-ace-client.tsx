@@ -139,6 +139,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     setIsProcessing(true);
     setProcessingProgress([0, files.length]);
     let processedCount = 0;
+    let successCount = 0;
 
     for (const file of files) {
       if (documents.some(doc => doc.source_file === file.name)) {
@@ -167,6 +168,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
         }
         
         const { document: newDoc, questions: newQuestions } = result;
+        successCount++;
 
         const questionsWithSource = newQuestions.map(q => ({
             ...q,
@@ -186,6 +188,12 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
 
     setIsProcessing(false);
     setProcessingProgress(null);
+    if (successCount > 0) {
+        toast({
+            title: "Upload Complete",
+            description: `${successCount} file(s) were successfully processed and added.`
+        });
+    }
   }, [session, toast, documents]);
 
   const handleDocumentDelete = useCallback(async (documentId: string) => {

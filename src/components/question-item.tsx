@@ -42,9 +42,10 @@ export function QuestionItem({ question, onQuestionUpdate, theory, uiState, setU
   const { toast } = useToast();
 
   const isVerified = !!question.correct_option;
+  const hasOptions = !!(question.options && question.options.length > 0);
 
   const handleVerifyAnswer = async () => {
-    if (!uiState.userSelectedOption) {
+    if (hasOptions && !uiState.userSelectedOption) {
       toast({ variant: 'destructive', title: 'Please select an option first.' });
       return;
     }
@@ -123,14 +124,14 @@ export function QuestionItem({ question, onQuestionUpdate, theory, uiState, setU
     <Card className="overflow-hidden">
       <CardContent className="p-6">
         <p className="text-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
-        {question.options && question.options.length > 0 && (
+        {hasOptions && (
           <RadioGroup 
             className="mb-4 space-y-2" 
             value={uiState.userSelectedOption} 
             onValueChange={handleSelectOption}
             disabled={isVerified}
           >
-            {question.options.map((option, index) => {
+            {question.options?.map((option, index) => {
               const isCorrect = normalizeOption(question.correct_option || '') === normalizeOption(option);
               const isSelected = uiState.userSelectedOption === option;
               
@@ -182,9 +183,9 @@ export function QuestionItem({ question, onQuestionUpdate, theory, uiState, setU
                 <Bookmark className={cn("w-4 h-4", question.is_bookmarked && "fill-primary text-primary")} />
             </Button>
             {!isVerified ? (
-              <Button onClick={handleVerifyAnswer} disabled={isVerifying || !uiState.userSelectedOption} className="w-full sm:w-auto">
+              <Button onClick={handleVerifyAnswer} disabled={isVerifying || (hasOptions && !uiState.userSelectedOption)} className="w-full sm:w-auto">
                 {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Verify Answer
+                {hasOptions ? "Verify Answer" : "Get Solution"}
               </Button>
             ) : (
               <Dialog open={isSolutionDialogOpen} onOpenChange={setIsSolutionDialogOpen}>

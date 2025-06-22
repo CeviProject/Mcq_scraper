@@ -49,7 +49,8 @@ const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ data, title = "Acti
       const firstDay = week.find(d => d);
       if (firstDay) {
         const month = getMonth(firstDay);
-        if (!acc.some(m => m.month === month)) {
+        // Ensure month label is not already present and there's enough space
+        if (!acc.some(m => m.month === month) && !acc.some(m => weekIndex - m.weekIndex < 5)) {
           acc.push({ month, label: format(firstDay, 'MMM'), weekIndex });
         }
       }
@@ -65,20 +66,21 @@ const ActivityCalendar: React.FC<ActivityCalendarProps> = ({ data, title = "Acti
           <CardDescription>Your test activity over the last year.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto pb-4">
-          <div className="inline-block relative" style={{ paddingLeft: '24px' }}>
-            <div className="flex" style={{ marginLeft: '-2px' }}>
-              {monthLabels.map(({ label, weekIndex }) => (
-                  <div key={label} className="text-xs text-muted-foreground absolute" style={{ left: `${24 + weekIndex * 14}px`, top: '-1.25rem' }}>
-                      {label}
-                  </div>
-              ))}
-            </div>
-            <div className="flex">
-              <div className="flex flex-col gap-1 pr-2 text-xs text-muted-foreground text-right" style={{marginTop: '2px'}}>
-                  <div className="h-2.5">Mon</div>
-                  <div className="h-2.5" style={{marginTop: '4px'}}>Wed</div>
-                  <div className="h-2.5" style={{marginTop: '4px'}}>Fri</div>
+          <div className="inline-block relative pt-8">
+            {/* Month Labels */}
+            {monthLabels.map(({ label, weekIndex }) => (
+                <div key={label} className="text-xs text-muted-foreground absolute" style={{ left: `calc(${weekIndex} * (0.625rem + 0.25rem) + 2rem)`, top: '0' }}>
+                    {label}
+                </div>
+            ))}
+            <div className="flex gap-4">
+              {/* Weekday Labels */}
+              <div className="flex flex-col text-xs text-muted-foreground justify-between">
+                  <span>Mon</span>
+                  <span>Wed</span>
+                  <span>Fri</span>
               </div>
+              {/* Grid */}
               <div className="flex gap-1">
                   {weeks.map((week, i) => (
                     <div key={i} className="flex flex-col gap-1">
