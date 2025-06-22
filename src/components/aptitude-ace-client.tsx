@@ -223,9 +223,8 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     if ('error' in result) {
         toast({ variant: "destructive", title: "Error renaming document", description: result.error });
     } else {
-        const { updatedDocument } = result;
-        setDocuments(prev => prev.map(d => d.id === documentId ? { ...d, source_file: updatedDocument.source_file } : d));
-        setQuestions(prev => prev.map(q => q.document_id === documentId ? { ...q, sourceFile: updatedDocument.source_file } : q));
+        setDocuments(prev => prev.map(d => d.id === documentId ? { ...d, source_file: newName } : d));
+        setQuestions(prev => prev.map(q => q.document_id === documentId ? { ...q, sourceFile: newName } : q));
         toast({ title: 'Document Renamed' });
     }
   }, [session, toast]);

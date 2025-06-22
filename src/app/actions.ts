@@ -154,7 +154,7 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
     }
 }
 
-export async function renameDocumentAction({ documentId, newName }: { documentId: string; newName: string }): Promise<{ updatedDocument: Document } | { error: string }> {
+export async function renameDocumentAction({ documentId, newName }: { documentId: string; newName: string }): Promise<{ success: true } | { error: string }> {
     const cookieStore = cookies();
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -201,18 +201,8 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             }
             throw new Error(`Failed to rename document: ${updateError.message}`);
         }
-        
-        const { data: updatedDoc, error: selectError } = await supabase
-            .from('documents')
-            .select('*')
-            .eq('id', documentId)
-            .single();
 
-        if (selectError || !updatedDoc) {
-             throw new Error("Failed to retrieve the updated record after renaming.");
-        }
-
-        return { updatedDocument: updatedDoc as Document };
+        return { success: true };
 
     } catch (error: any) {
         console.error('Error renaming document:', error);
