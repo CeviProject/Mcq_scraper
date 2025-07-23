@@ -1,18 +1,21 @@
+
 'use client'
 
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { File, HelpCircle, List, Trophy } from 'lucide-react';
+import { File, HelpCircle, Info, List, Trophy } from 'lucide-react';
 import Image from 'next/image';
 import { Test } from '@/lib/types';
 import ActivityCalendar from './activity-calendar';
-import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
+import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell, Legend } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { createClient } from '@/lib/supabase';
+import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 interface DashboardTabProps {
   sourceFiles: string[];
@@ -141,8 +144,8 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
             <ActivityCalendar data={analyticsData.activityData} title="Test Activity" />
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base font-medium">Topic Performance</CardTitle>
-                    <CardDescription>Performance based on all tests taken.</CardDescription>
+                    <CardTitle className="text-base font-medium">Top Topic Performance</CardTitle>
+                    <CardDescription>Your accuracy in your best-performing topics.</CardDescription>
                 </CardHeader>
                 <CardContent className="h-[250px] flex items-center justify-center">
                     {topicPerformance.length > 0 ? (
@@ -213,3 +216,5 @@ export default function DashboardTab({ sourceFiles, questionCount, testHistory }
     </div>
   );
 }
+
+    

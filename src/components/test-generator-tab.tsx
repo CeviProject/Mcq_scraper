@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock, Users, Lightbulb } from 'lucide-react';
+import { FileText, Wand2, ArrowRight, Loader2, CheckCircle, XCircle, BarChart, RefreshCw, ChevronDown, Clock, Users, Lightbulb, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { batchSolveQuestionsAction, generateTestFeedbackAction, getTopicBenchmarkAction, getWrongAnswerExplanationAction } from '@/app/actions';
@@ -23,6 +24,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { createClient } from '@/lib/supabase';
+import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type TestStatus = 'configuring' | 'in-progress' | 'finishing' | 'results';
 
@@ -131,6 +133,8 @@ function TestResults({
     }
     if (performanceByTopic.length > 0) {
         fetchBenchmarks();
+    } else {
+        setIsFetchingBenchmarks(false);
     }
   }, [performanceByTopic]);
 
@@ -138,7 +142,7 @@ function TestResults({
     return performanceByTopic.map(p => ({
         name: p.name,
         'Your Accuracy': p.accuracy,
-        'Peer Average': benchmarks[p.name] || 0,
+        'Global Average': benchmarks[p.name] || 0,
     }));
   }, [performanceByTopic, benchmarks]);
 
@@ -155,13 +159,24 @@ function TestResults({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base"><BarChart className="h-5 w-5"/>Performance by Topic</CardTitle>
-                     <CardDescription className="flex items-center gap-1.5 text-xs"><Users className="h-3 w-3" /> Compare your results with the peer average.</CardDescription>
+                     <CardDescription className="flex items-center gap-1.5 text-xs">
+                        <Users className="h-3 w-3" />
+                        <span>Compare your results with the global average.</span>
+                         <TooltipProvider>
+                            <UiTooltip>
+                                <TooltipTrigger><Info className="h-3 w-3" /></TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                    <p>The "Global Average" is the average score of all users on this platform for each topic, giving you a benchmark of your performance.</p>
+                                </TooltipContent>
+                            </UiTooltip>
+                        </TooltipProvider>
+                     </CardDescription>
                 </CardHeader>
                 <CardContent className="h-60">
                    {isFetchingBenchmarks && chartData.length > 0 ? (
                        <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
                            <Loader2 className="h-4 w-4 animate-spin" />
-                           <span>Fetching peer data...</span>
+                           <span>Fetching benchmark data...</span>
                        </div>
                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
@@ -175,7 +190,7 @@ function TestResults({
                             />
                             <Legend wrapperStyle={{fontSize: '0.8rem', paddingTop: '10px'}}/>
                             <Bar dataKey="Your Accuracy" fill="hsl(var(--primary))" radius={[4, 4, 4, 4]} barSize={12} />
-                            <Bar dataKey="Peer Average" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 4, 4]} barSize={12}/>
+                            <Bar dataKey="Global Average" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 4, 4]} barSize={12}/>
                         </RechartsBarChart>
                     </ResponsiveContainer>
                    )}
@@ -650,3 +665,5 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
     </Card>
   );
 }
+
+    

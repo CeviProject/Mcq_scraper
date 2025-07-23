@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Question, Test, TestAttempt } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { History, Loader2, CheckCircle, XCircle, BarChart, Users, Lightbulb } from 'lucide-react';
+import { History, Loader2, CheckCircle, XCircle, BarChart, Users, Lightbulb, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getTopicBenchmarkAction, getWrongAnswerExplanationAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,8 @@ import { cn, normalizeOption } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 function WhyWrongDialog({ question, userAnswer }: { question: Question, userAnswer: string }) {
     const [explanation, setExplanation] = useState('');
@@ -137,17 +139,28 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
         return performanceByTopic.map(p => ({
             name: p.name,
             'Your Accuracy': p.accuracy,
-            'Peer Average': benchmarks[p.name] || 0,
+            'Global Average': benchmarks[p.name] || 0,
         }));
     }, [performanceByTopic, benchmarks]);
 
   return (
-    <div className="space-y-6 pt-2 pb-4 px-4">
+    <div className="space-y-6 pt-2 pb-4 px-4 bg-muted/30">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base"><BarChart className="h-5 w-5"/>Performance by Topic</CardTitle>
-                     <CardDescription className="flex items-center gap-1.5 text-xs"><Users className="h-3 w-3" /> Compare your results with the peer average.</CardDescription>
+                    <CardDescription className="flex items-center gap-1.5 text-xs">
+                        <Users className="h-3 w-3" />
+                        <span>Compare your results with the global average.</span>
+                         <TooltipProvider>
+                            <UiTooltip>
+                                <TooltipTrigger><Info className="h-3 w-3" /></TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                    <p>The "Global Average" is the average score of all users on this platform for each topic, giving you a benchmark of your performance.</p>
+                                </TooltipContent>
+                            </UiTooltip>
+                        </TooltipProvider>
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="h-[250px]">
                    {chartData.length === 0 ? (
@@ -157,13 +170,13 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
                    ) : isFetchingBenchmarks ? (
                        <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
                            <Loader2 className="h-4 w-4 animate-spin" />
-                           <span>Fetching peer data...</span>
+                           <span>Fetching benchmark data...</span>
                        </div>
                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
                         <RechartsBarChart data={chartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 20 }}>
                             <XAxis type="number" hide domain={[0, 100]}/>
-                            <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                            <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
                             <Tooltip 
                                 cursor={{fill: 'hsl(var(--muted))'}} 
                                 contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}
@@ -171,7 +184,7 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
                             />
                             <Legend wrapperStyle={{fontSize: '0.8rem', paddingTop: '10px'}} verticalAlign="bottom" />
                             <Bar dataKey="Your Accuracy" fill="hsl(var(--primary))" radius={[4, 4, 4, 4]} barSize={12} />
-                            <Bar dataKey="Peer Average" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 4, 4]} barSize={12}/>
+                            <Bar dataKey="Global Average" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 4, 4]} barSize={12}/>
                         </RechartsBarChart>
                     </ResponsiveContainer>
                    )}
@@ -290,3 +303,5 @@ export default function TestHistoryTab({ allQuestions, testHistory }: { allQuest
     </div>
   );
 }
+
+    
