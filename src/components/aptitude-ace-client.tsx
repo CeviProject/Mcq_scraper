@@ -1,8 +1,9 @@
+
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2, Bookmark, CalendarClock } from 'lucide-react';
-import { Document, Question, TestResult, ChatMessage, Test, Profile } from '@/lib/types';
+import { BrainCircuit, BookOpen, ListChecks, FileText, LayoutDashboard, Settings, Upload, Loader2, Bookmark, CalendarClock, History } from 'lucide-react';
+import { Document, Question, TestResult, ChatMessage, Test, Profile, TestAttempt } from '@/lib/types';
 import { segregateContentAction, deleteDocumentAction, renameDocumentAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,13 +18,14 @@ import SettingsSheet from './settings-sheet';
 import RevisionPlannerTab from './revision-planner-tab';
 import { createClient } from '@/lib/supabase';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import TestHistoryTab from './test-history-tab';
 
 export default function AptitudeAceClient({ session, profile: initialProfile }: { session: Session | null, profile: Profile | null }) {
   const supabase: SupabaseClient = useMemo(() => createClient(), []);
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [testHistory, setTestHistory] = useState<Test[]>([]);
+  const [testHistory, setTestHistory] = useState<(Test & { test_attempts: TestAttempt[] })[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,7 +51,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
       const [docsRes, questionsRes, testsRes] = await Promise.all([
         supabase.from('documents').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }),
         supabase.from('questions').select('*, documents(source_file)').eq('user_id', session.user.id).order('created_at', { ascending: false }),
-        supabase.from('tests').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false })
+        supabase.from('tests').select('*, test_attempts(*)').eq('user_id', session.user.id).order('created_at', { ascending: false })
       ]);
       
       if (docsRes.error || testsRes.error || questionsRes.error) {
@@ -65,6 +67,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
         
         setQuestions(questionsWithSourceFile as Question[]);
         
+        // @ts-ignore
         setTestHistory(testsRes.data || []);
       }
       setIsLoading(false);
@@ -118,12 +121,17 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
       };
     });
 
-    const { error: attemptsError } = await supabase.from('test_attempts').insert(attempts);
+    const { data: attemptsData, error: attemptsError } = await supabase.from('test_attempts').insert(attempts).select();
     if(attemptsError) {
        toast({ variant: 'destructive', title: 'Error saving test attempts', description: attemptsError?.message });
     }
+    
+    const newTestHistoryItem = {
+      ...testData,
+      test_attempts: attemptsData || []
+    }
 
-    setTestHistory(prev => [testData, ...prev]);
+    setTestHistory(prev => [newTestHistoryItem, ...prev]);
 
     toast({
         title: "Test Saved",
@@ -138,52 +146,47 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     }
     setIsProcessing(true);
     setProcessingProgress([0, files.length]);
-    let processedCount = 0;
     let successCount = 0;
 
-    for (const file of files) {
-      if (documents.some(doc => doc.source_file === file.name)) {
-        toast({
-          title: 'File Skipped',
-          description: `"${file.name}" has already been uploaded.`
-        });
-        processedCount++;
-        setProcessingProgress([processedCount, files.length]);
-        continue;
-      }
-
-      try {
-        const pdfDataUri = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-
-        const result = await segregateContentAction({ pdfDataUri, fileName: file.name });
-
-        if ('error' in result) {
-          toast({ variant: "destructive", title: `Error processing ${file.name}`, description: result.error });
-          continue;
+    for (const [index, file] of files.entries()) {
+        setProcessingProgress([index + 1, files.length]);
+        if (documents.some(doc => doc.source_file === file.name)) {
+            toast({
+            title: 'File Skipped',
+            description: `"${file.name}" has already been uploaded.`
+            });
+            continue;
         }
-        
-        const { document: newDoc, questions: newQuestions } = result;
-        successCount++;
 
-        const questionsWithSource = newQuestions.map(q => ({
-            ...q,
-            sourceFile: newDoc.source_file
-        }));
+        try {
+            const pdfDataUri = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
 
-        setQuestions(prev => [...questionsWithSource, ...prev]);
-        setDocuments(prev => [{...newDoc, questions: []}, ...prev]);
+            const result = await segregateContentAction({ pdfDataUri, fileName: file.name });
 
-      } catch (error: any) {
-        toast({ variant: "destructive", title: `Error processing ${file.name}`, description: error.message });
-      } finally {
-        processedCount++;
-        setProcessingProgress([processedCount, files.length]);
-      }
+            if ('error' in result) {
+            toast({ variant: "destructive", title: `Error processing ${file.name}`, description: result.error });
+            continue;
+            }
+            
+            const { document: newDoc, questions: newQuestions } = result;
+            successCount++;
+
+            const questionsWithSource = newQuestions.map(q => ({
+                ...q,
+                sourceFile: newDoc.source_file
+            }));
+
+            setQuestions(prev => [...questionsWithSource, ...prev]);
+            setDocuments(prev => [{...newDoc, questions: []}, ...prev]);
+
+        } catch (error: any) {
+            toast({ variant: "destructive", title: `Error processing ${file.name}`, description: error.message });
+        }
     }
 
     setIsProcessing(false);
@@ -191,7 +194,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
     if (successCount > 0) {
         toast({
             title: "Upload Complete",
-            description: `${successCount} file(s) were successfully processed and added.`
+            description: `${successCount} out of ${files.length} file(s) were successfully processed and added.`
         });
     }
   }, [session, toast, documents]);
@@ -279,13 +282,14 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
       </header>
       <div className="container mx-auto p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 h-auto">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 h-auto">
             <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</TabsTrigger>
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Upload</TabsTrigger>
             <TabsTrigger value="theory" className="gap-2" disabled={documents.length === 0}><BookOpen className="h-4 w-4" />Theory</TabsTrigger>
             <TabsTrigger value="questions" className="gap-2" disabled={questions.length === 0}><ListChecks className="h-4 w-4" />Questions</TabsTrigger>
-            <TabsTrigger value="review" className="gap-2" disabled={bookmarkedQuestions.length === 0}><Bookmark className="h-4 w-4" />Review</TabsTrigger>
+            <TabsTrigger value="bookmarks" className="gap-2" disabled={bookmarkedQuestions.length === 0}><Bookmark className="h-4 w-4" />Bookmarks</TabsTrigger>
             <TabsTrigger value="test-generator" className="gap-2" disabled={questions.length === 0}><FileText className="h-4 w-4" />Mock Test</TabsTrigger>
+            <TabsTrigger value="test-history" className="gap-2" disabled={testHistory.length === 0}><History className="h-4 w-4" />History</TabsTrigger>
             <TabsTrigger value="revision-plan" className="gap-2" disabled={testHistory.length === 0}><CalendarClock className="h-4 w-4" />Revision Plan</TabsTrigger>
           </TabsList>
 
@@ -315,7 +319,7 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
                 setQuestionUiState={setQuestionUiState}
             />
           </TabsContent>
-           <TabsContent value="review" className="mt-6">
+           <TabsContent value="bookmarks" className="mt-6">
             <ReviewTab 
                 questions={bookmarkedQuestions} 
                 onQuestionUpdate={handleQuestionUpdate} 
@@ -329,6 +333,12 @@ export default function AptitudeAceClient({ session, profile: initialProfile }: 
               questions={questions} 
               onTestComplete={handleTestComplete} 
               onQuestionsUpdate={handleQuestionsUpdate}
+            />
+          </TabsContent>
+           <TabsContent value="test-history" className="mt-6">
+            <TestHistoryTab
+              allQuestions={questions}
+              testHistory={testHistory}
             />
           </TabsContent>
           <TabsContent value="revision-plan" className="mt-6">

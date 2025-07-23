@@ -1,8 +1,9 @@
+
 'use client'
 
 import React from 'react';
 import { Question, Document, ChatMessage } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bookmark } from 'lucide-react';
 import { QuestionItem } from './question-item';
 
