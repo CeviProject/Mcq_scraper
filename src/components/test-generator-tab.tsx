@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -363,7 +364,10 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
 
   const handleGenerateTest = async () => {
     setIsGenerating(true);
-    let filtered = testableQuestions.filter(q => {
+    let finalTestQuestions: Question[] = [];
+    
+    // First, get all questions that match the basic filters (topic, difficulty, source)
+    let candidateQuestions = testableQuestions.filter(q => {
       const topicMatch = topicFilter !== 'All' ? q.topic === topicFilter : true;
       const difficultyMatch = difficultyFilter !== 'All' ? q.difficulty === difficultyFilter : true;
       const sourceFileMatch = sourceFileFilter.length === 0 ? true : sourceFileFilter.includes(q.sourceFile!);
@@ -379,38 +383,38 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
             const weakTopics = performanceData.filter((p: any) => p.accuracy < 60).sort((a: any, b: any) => a.accuracy - b.accuracy).map((p: any) => p.topic);
             
             if (weakTopics.length > 0) {
-                const weakQuestions = filtered.filter(q => weakTopics.includes(q.topic));
-                const otherQuestions = filtered.filter(q => !weakTopics.includes(q.topic));
+                toast({ title: "Adaptive test ready!", description: `Focusing on your weak areas: ${weakTopics.slice(0,3).join(', ')}.`});
+                
+                const weakQuestions = candidateQuestions.filter(q => weakTopics.includes(q.topic));
+                const otherQuestions = candidateQuestions.filter(q => !weakTopics.includes(q.topic));
+                
+                // Prioritize weak questions
+                finalTestQuestions.push(...weakQuestions.sort(() => 0.5 - Math.random()));
 
-                const numWeak = Math.min(weakQuestions.length, Math.ceil(numQuestions * 0.7));
-                const numOther = numQuestions - numWeak;
-
-                const finalTestQuestions = [
-                    ...weakQuestions.sort(() => 0.5 - Math.random()).slice(0, numWeak),
-                    ...otherQuestions.sort(() => 0.5 - Math.random()).slice(0, numOther)
-                ];
-
-                if (finalTestQuestions.length >= numQuestions) {
-                    filtered = finalTestQuestions;
-                    toast({ title: "Adaptive test ready!", description: `Focusing on your weak areas: ${weakTopics.slice(0,3).join(', ')}.`});
+                // If not enough weak questions, fill with other questions
+                if (finalTestQuestions.length < numQuestions) {
+                    finalTestQuestions.push(...otherQuestions.sort(() => 0.5 - Math.random()));
                 }
+
+                // If still not enough, it will be handled by the check below
+                candidateQuestions = finalTestQuestions;
             }
         }
     }
 
 
-    if (filtered.length < numQuestions) {
+    if (candidateQuestions.length < numQuestions) {
         toast({
             variant: "destructive",
             title: "Not Enough Questions",
-            description: `Found only ${filtered.length} questions matching your criteria. Please broaden your search or reduce the number of questions.`,
+            description: `Found only ${candidateQuestions.length} questions matching your criteria. Please broaden your filters or reduce the number of questions.`,
         });
         setIsGenerating(false);
         return;
     }
 
-    const shuffled = filtered.sort(() => 0.5 - Math.random());
-    const test = shuffled.slice(0, numQuestions);
+    // Shuffle and slice to the desired number of questions
+    const test = candidateQuestions.sort(() => 0.5 - Math.random()).slice(0, numQuestions);
 
     const questionsToSolve = test.filter(q => !q.solution);
 
