@@ -1,11 +1,11 @@
 
 'use client'
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Question, Test, TestAttempt } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { History, Loader2, CheckCircle, XCircle, BarChart, Users, Lightbulb, ChevronDown, ChevronUp } from 'lucide-react';
+import { History, Loader2, CheckCircle, XCircle, BarChart, Users, Lightbulb } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getTopicBenchmarkAction, getWrongAnswerExplanationAction } from '@/app/actions';
 import { useToast } from "@/hooks/use-toast";
@@ -74,7 +74,7 @@ function WhyWrongDialog({ question, userAnswer }: { question: Question, userAnsw
 }
 
 function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempts: TestAttempt[] }, allQuestions: Question[] }) {
-    const { score, total, feedback, test_attempts } = test;
+    const { feedback, test_attempts } = test;
     const [benchmarks, setBenchmarks] = useState<Record<string, number>>({});
     const [isFetchingBenchmarks, setIsFetchingBenchmarks] = useState(true);
 
@@ -142,14 +142,14 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
     }, [performanceByTopic, benchmarks]);
 
   return (
-    <div className="space-y-6 pl-6 border-l">
+    <div className="space-y-6 pt-2 pb-4 px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base"><BarChart className="h-5 w-5"/>Performance by Topic</CardTitle>
                      <CardDescription className="flex items-center gap-1.5 text-xs"><Users className="h-3 w-3" /> Compare your results with the peer average.</CardDescription>
                 </CardHeader>
-                <CardContent className="h-60">
+                <CardContent className="h-[250px] pl-0">
                    {chartData.length === 0 ? (
                        <div className="flex items-center justify-center h-full text-muted-foreground">
                            <p>No topic data for this test.</p>
@@ -161,15 +161,15 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
                        </div>
                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                        <RechartsBarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                        <RechartsBarChart data={chartData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 20 }}>
                             <XAxis type="number" hide domain={[0, 100]}/>
-                            <YAxis dataKey="name" type="category" width={120} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                            <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
                             <Tooltip 
                                 cursor={{fill: 'hsl(var(--muted))'}} 
                                 contentStyle={{backgroundColor: 'hsl(var(--background))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}
                                 formatter={(value) => `${value}%`}
                             />
-                            <Legend wrapperStyle={{fontSize: '0.8rem', paddingTop: '10px'}}/>
+                            <Legend wrapperStyle={{fontSize: '0.8rem', paddingTop: '10px'}} verticalAlign="bottom" />
                             <Bar dataKey="Your Accuracy" fill="hsl(var(--primary))" radius={[4, 4, 4, 4]} barSize={12} />
                             <Bar dataKey="Peer Average" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 4, 4]} barSize={12}/>
                         </RechartsBarChart>
@@ -261,19 +261,19 @@ export default function TestHistoryTab({ allQuestions, testHistory }: { allQuest
           <CardTitle>Test History</CardTitle>
           <CardDescription>Review your past performance. Click on any test to see a detailed breakdown.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 sm:p-2 md:p-4">
             <Accordion type="single" collapsible className="w-full">
             {testHistory.map(test => (
                 <AccordionItem value={test.id} key={test.id}>
-                    <AccordionTrigger className="hover:no-underline">
-                        <div className="flex justify-between items-center w-full pr-4">
+                    <AccordionTrigger className="hover:no-underline px-4 py-3 hover:bg-muted/50 rounded-md">
+                        <div className="flex justify-between items-center w-full">
                             <div>
-                                <h4 className="font-semibold text-base">Test from {format(new Date(test.created_at), 'MMMM d, yyyy')}</h4>
-                                <p className="text-sm text-muted-foreground font-normal">{formatDistanceToNow(new Date(test.created_at), { addSuffix: true })}</p>
+                                <h4 className="font-semibold text-base text-left">Test from {format(new Date(test.created_at), 'MMMM d, yyyy')}</h4>
+                                <p className="text-sm text-muted-foreground font-normal text-left">{formatDistanceToNow(new Date(test.created_at), { addSuffix: true })}</p>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex items-center gap-4">
                                  <p className="text-lg font-bold">{test.score}/{test.total}</p>
-                                <Badge variant={test.score/test.total >= 0.7 ? "default" : "destructive"}>
+                                <Badge variant={test.score/test.total >= 0.7 ? "default" : "destructive"} className="text-base">
                                     {((test.score / test.total) * 100).toFixed(0)}%
                                 </Badge>
                             </div>
