@@ -10,30 +10,6 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Document, Question } from '@/lib/types';
 
-async function getApiKey(): Promise<string | undefined> {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value
-                },
-            },
-        }
-    );
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-        return undefined;
-    }
-
-    const { data: profile } = await supabase.from('profiles').select('gemini_api_key').eq('id', user.id).single();
-    
-    return profile?.gemini_api_key || undefined;
-}
-
 
 export async function segregateContentAction(input: Omit<ContentSegregationInput, 'apiKey'> & { fileName: string }): Promise<{ document: Document, questions: Question[] } | { error: string }> {
   const cookieStore = cookies();
@@ -55,8 +31,6 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
       throw new Error("Authentication error: You must be logged in to upload documents.");
     }
     
-    // Ensure a profile exists for the user before proceeding.
-    // This prevents foreign key constraint violations if a profile wasn't created on sign-up.
     const { data: profile } = await supabase
       .from('profiles')
       .select('id')
@@ -195,9 +169,6 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
             .eq('user_id', user.id);
         
         if (updateError) {
-            if (updateError.message.includes('violates row-level security policy')) {
-                throw new Error("Database security error: You do not have permission to rename this document.");
-            }
             throw new Error(`Failed to rename document: ${updateError.message}`);
         }
 
