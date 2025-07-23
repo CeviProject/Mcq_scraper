@@ -72,8 +72,8 @@ export default async function Home() {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
   const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
   let profile: Profile | null = null;
   if (user) {

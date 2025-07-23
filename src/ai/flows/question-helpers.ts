@@ -171,14 +171,13 @@ const getTricksPrompt = ai.definePrompt({
     model: googleAI.model('gemini-1.5-flash-latest'),
     input: {schema: GetTricksInputSchema},
     output: {schema: GetTricksOutputSchema},
-    prompt: `You are an expert aptitude test coach. Your goal is to provide highly specific and actionable advice for solving a certain category of problem, based on a single sample question.
+    prompt: `You are an expert aptitude test coach. A student wants some quick tips for solving a specific type of problem.
 
 **Your Task:**
-1.  **Identify the Core Concept:** Look at the content of the sample question below and identify the fundamental mathematical or logical concept being tested. For example, is it about integer multiplication rules, percentages, ratios, logical deduction, etc.?
-2.  **Provide Specific Tricks:** Based on that core concept, generate a list of relevant rules, formulas, and shortcut strategies.
-3.  **DO NOT be generic.** Your advice must be tailored to the specific topic you identified. For example, if the question is \`Which of the following statement is correct? a) (+) x (-) = (-) ...\`, the core concept is "rules of integer multiplication". Your tricks should be about how signs behave in multiplication (e.g., "A negative times a positive is always negative"). It should NOT be a generic guide on "how to evaluate statements". Similarly, if the question is about "boats and streams", give tricks for that specific scenario, not general "speed and distance" formulas.
-4.  **Do not solve the provided question.** Use it only to understand the problem type.
-5.  Format your response in Markdown.
+Based on the sample question below, provide a short, actionable list of tips, tricks, and formulas for solving questions of this type.
+- Do not solve the provided question.
+- Do not explain the concepts in depth. Just provide the shortcuts.
+- Format your response in Markdown, using bullet points.
 
 Sample Question:
 {{{questionText}}}
