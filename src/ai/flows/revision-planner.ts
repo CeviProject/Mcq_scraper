@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Generates a personalized revision plan based on user's test performance.
@@ -8,8 +9,6 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 
@@ -20,7 +19,6 @@ const TopicPerformanceSchema = z.object({
 
 const GenerateRevisionPlanInputSchema = z.object({
   performanceData: z.array(TopicPerformanceSchema).describe("An array of the user's performance per topic."),
-  apiKey: z.string().optional().describe("User's Gemini API key."),
 });
 export type GenerateRevisionPlanInput = z.infer<typeof GenerateRevisionPlanInputSchema>;
 
@@ -41,25 +39,11 @@ export async function generateRevisionPlan(input: GenerateRevisionPlanInput): Pr
   return generateRevisionPlanFlow(input);
 }
 
-const generateRevisionPlanFlow = ai.defineFlow(
-    {
-        name: 'generateRevisionPlanFlow',
-        inputSchema: GenerateRevisionPlanInputSchema,
-        outputSchema: GenerateRevisionPlanOutputSchema,
-    },
-    async (input) => {
-        const key = input.apiKey || process.env.GOOGLE_API_KEY;
-        if (!key) {
-            throw new Error("A Gemini API key is required. Please add it in Settings or set GOOGLE_API_KEY in your environment.");
-        }
-        const dynamicAi = genkit({ plugins: [googleAI({ apiKey: key })] });
-
-        const feedbackPrompt = dynamicAi.definePrompt({
-            name: 'generateRevisionPlanPrompt_dynamic',
-            model: 'googleai/gemini-1.5-flash-latest',
-            input: {schema: GenerateRevisionPlanInputSchema},
-            output: {schema: GenerateRevisionPlanOutputSchema},
-            prompt: `You are an expert academic coach creating a personalized 7-day revision schedule for a student preparing for aptitude tests.
+const revisionPlannerPrompt = ai.definePrompt({
+    name: 'generateRevisionPlanPrompt',
+    input: {schema: GenerateRevisionPlanInputSchema},
+    output: {schema: GenerateRevisionPlanOutputSchema},
+    prompt: `You are an expert academic coach creating a personalized 7-day revision schedule for a student preparing for aptitude tests.
 The student's performance data, showing their accuracy on different topics, is provided below.
 
 Performance Data (Topic, Accuracy %):
@@ -75,9 +59,16 @@ Your Task:
 7.  **Provide Encouraging Reasons**: For each study day, provide a short, positive reason for focusing on that topic (e.g., "Let's build a strong foundation here," or "Time to solidify your understanding.").
 8.  **Format the Output**: Return the plan as a JSON array of objects, with each object containing the day, the topic to study, and the reason.
 `,
-        });
+});
 
-        const {output} = await feedbackPrompt(input);
+const generateRevisionPlanFlow = ai.defineFlow(
+    {
+        name: 'generateRevisionPlanFlow',
+        inputSchema: GenerateRevisionPlanInputSchema,
+        outputSchema: GenerateRevisionPlanOutputSchema,
+    },
+    async (input) => {
+        const {output} = await revisionPlannerPrompt(input);
         return output!;
     }
 );

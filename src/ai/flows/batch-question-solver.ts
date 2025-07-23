@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Solves a batch of questions efficiently.
@@ -8,8 +9,6 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 const QuestionToSolveSchema = z.object({
@@ -20,7 +19,6 @@ const QuestionToSolveSchema = z.object({
 
 const BatchSolveInputSchema = z.object({
   questions: z.array(QuestionToSolveSchema),
-  apiKey: z.string().optional().describe("User's Gemini API key."),
 });
 export type BatchSolveInput = z.infer<typeof BatchSolveInputSchema>;
 
@@ -41,6 +39,26 @@ export async function batchSolveQuestions(input: BatchSolveInput): Promise<Batch
   return batchSolveFlow(input);
 }
 
+const batchSolvePrompt = ai.definePrompt({
+  name: 'batchSolvePrompt',
+  input: {schema: BatchSolveInputSchema},
+  output: {schema: BatchSolveOutputSchema},
+  prompt: `You are an expert aptitude test tutor. You will be given a JSON array of questions.
+Your task is to solve each question and provide a detailed solution, identify the correct option, and assess the difficulty.
+
+For each question in the input array, you must:
+1.  Provide a clear, step-by-step solution. Use your general expertise. Format the response in Markdown. When writing mathematical formulas or equations, use LaTeX syntax (e.g., $...$ for inline, $$...$$ for block).
+2.  Determine the correct multiple-choice option from the provided list. The 'correctOption' field must exactly match one of the strings in the input 'options' array.
+3.  Estimate the difficulty and set it to 'Easy', 'Medium', or 'Hard'.
+4.  Return the original 'id' of the question in your response for mapping.
+
+Process all questions provided in the input JSON and return the results in the 'solvedQuestions' array.
+
+Input Questions:
+{{{json questions}}}
+`,
+});
+
 const batchSolveFlow = ai.defineFlow(
   {
     name: 'batchSolveFlow',
@@ -48,34 +66,7 @@ const batchSolveFlow = ai.defineFlow(
     outputSchema: BatchSolveOutputSchema,
   },
   async (input) => {
-    const key = input.apiKey || process.env.GOOGLE_API_KEY;
-    if (!key) {
-        throw new Error("A Gemini API key is required. Please add it in Settings or set GOOGLE_API_KEY in your environment.");
-    }
-    const dynamicAi = genkit({ plugins: [googleAI({ apiKey: key })] });
-    
-    const prompt = dynamicAi.definePrompt({
-      name: 'batchSolvePrompt_dynamic',
-      model: 'googleai/gemini-1.5-flash-latest',
-      input: {schema: BatchSolveInputSchema},
-      output: {schema: BatchSolveOutputSchema},
-      prompt: `You are an expert aptitude test tutor. You will be given a JSON array of questions.
-    Your task is to solve each question and provide a detailed solution, identify the correct option, and assess the difficulty.
-
-    For each question in the input array, you must:
-    1.  Provide a clear, step-by-step solution. Use your general expertise. Format the response in Markdown. When writing mathematical formulas or equations, use LaTeX syntax (e.g., $...$ for inline, $$...$$ for block).
-    2.  Determine the correct multiple-choice option from the provided list. The 'correctOption' field must exactly match one of the strings in the input 'options' array.
-    3.  Estimate the difficulty and set it to 'Easy', 'Medium', or 'Hard'.
-    4.  Return the original 'id' of the question in your response for mapping.
-
-    Process all questions provided in the input JSON and return the results in the 'solvedQuestions' array.
-
-    Input Questions:
-    {{{json questions}}}
-    `,
-    });
-
-    const {output} = await prompt(input);
+    const {output} = await batchSolvePrompt(input);
     return output!;
   }
 );

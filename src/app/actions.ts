@@ -1,3 +1,4 @@
+
 'use server';
 
 import { contentSegregation, ContentSegregationInput } from '@/ai/flows/content-segregation';
@@ -74,10 +75,8 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
         throw new Error(`Failed to create user profile: ${profileError.message}`);
       }
     }
-
-    const apiKey = await getApiKey(); 
     
-    const segResult = await contentSegregation({ pdfDataUri: input.pdfDataUri, apiKey });
+    const segResult = await contentSegregation({ pdfDataUri: input.pdfDataUri });
     
     const { data: docData, error: docError } = await supabase
         .from('documents')
@@ -211,10 +210,9 @@ export async function renameDocumentAction({ documentId, newName }: { documentId
 }
 
 
-export async function getSolutionAction(input: Omit<GetSolutionInput, 'apiKey'>): Promise<GetSolutionOutput | { error: string }> {
+export async function getSolutionAction(input: GetSolutionInput): Promise<GetSolutionOutput | { error: string }> {
     try {
-        const apiKey = await getApiKey();
-        const result = await getSolution({ ...input, apiKey });
+        const result = await getSolution(input);
         return result;
     } catch (error: any) {
         console.error('Error getting solution:', error);
@@ -222,10 +220,9 @@ export async function getSolutionAction(input: Omit<GetSolutionInput, 'apiKey'>)
     }
 }
 
-export async function getTricksAction(input: Omit<GetTricksInput, 'apiKey'>): Promise<GetTricksOutput | { error: string }> {
+export async function getTricksAction(input: GetTricksInput): Promise<GetTricksOutput | { error: string }> {
     try {
-        const apiKey = await getApiKey();
-        const result = await getTricks({ ...input, apiKey });
+        const result = await getTricks(input);
         return result;
     } catch (error: any) {
         console.error('Error getting tricks:', error);
@@ -233,10 +230,9 @@ export async function getTricksAction(input: Omit<GetTricksInput, 'apiKey'>): Pr
     }
 }
 
-export async function askFollowUpAction(input: Omit<AskFollowUpInput, 'apiKey'>): Promise<AskFollowUpOutput | { error: string }> {
+export async function askFollowUpAction(input: AskFollowUpInput): Promise<AskFollowUpOutput | { error: string }> {
     try {
-        const apiKey = await getApiKey();
-        const result = await askFollowUp({ ...input, apiKey });
+        const result = await askFollowUp(input);
         return result;
     } catch (error: any) {
         console.error('Error in follow-up conversation:', error);
@@ -244,10 +240,9 @@ export async function askFollowUpAction(input: Omit<AskFollowUpInput, 'apiKey'>)
     }
 }
 
-export async function generateTestFeedbackAction(input: Omit<GenerateTestFeedbackInput, 'apiKey'>): Promise<GenerateTestFeedbackOutput | { error: string }> {
+export async function generateTestFeedbackAction(input: GenerateTestFeedbackInput): Promise<GenerateTestFeedbackOutput | { error: string }> {
     try {
-        const apiKey = await getApiKey();
-        const result = await generateTestFeedback({ ...input, apiKey });
+        const result = await generateTestFeedback(input);
         return result;
     } catch (error: any) {
         console.error('Error generating test feedback:', error);
@@ -257,7 +252,7 @@ export async function generateTestFeedbackAction(input: Omit<GenerateTestFeedbac
 
 
 export async function batchSolveQuestionsAction(
-    input: Omit<BatchSolveInput, 'apiKey'>
+    input: BatchSolveInput
 ): Promise<BatchSolveOutput | { error: string }> {
     const cookieStore = cookies();
     const supabase = createServerClient(
@@ -274,8 +269,7 @@ export async function batchSolveQuestionsAction(
             throw new Error("Authentication error: You must be logged in.");
         }
 
-        const apiKey = await getApiKey();
-        const result = await batchSolveQuestions({ ...input, apiKey });
+        const result = await batchSolveQuestions(input);
 
         if (result.solvedQuestions && result.solvedQuestions.length > 0) {
             
@@ -354,10 +348,9 @@ export async function getTopicBenchmarkAction({ topic }: { topic: string }): Pro
 }
 
 
-export async function getWrongAnswerExplanationAction(input: Omit<GetWrongAnswerExplanationInput, 'apiKey'>): Promise<GetWrongAnswerExplanationOutput | { error: string }> {
+export async function getWrongAnswerExplanationAction(input: GetWrongAnswerExplanationInput): Promise<GetWrongAnswerExplanationOutput | { error: string }> {
     try {
-        const apiKey = await getApiKey();
-        const result = await getWrongAnswerExplanation({ ...input, apiKey });
+        const result = await getWrongAnswerExplanation(input);
         return result;
     } catch (error: any) {
         console.error('Error getting wrong answer explanation:', error);
@@ -397,8 +390,7 @@ export async function generateRevisionPlanAction(): Promise<GenerateRevisionPlan
             accuracy: d.accuracy,
         }));
         
-        const apiKey = await getApiKey();
-        const result = await generateRevisionPlan({ performanceData: formattedPerformance, apiKey });
+        const result = await generateRevisionPlan({ performanceData: formattedPerformance });
         return result;
 
     } catch (error: any) {
