@@ -8,8 +8,7 @@
  * - BatchSolveOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/googleai';
+import { defineFlow, ai } from '@/ai/genkit';
 import {z} from 'genkit';
 
 const QuestionToSolveSchema = z.object({
@@ -40,12 +39,18 @@ export async function batchSolveQuestions(input: BatchSolveInput): Promise<Batch
   return batchSolveFlow(input);
 }
 
-const batchSolvePrompt = ai.definePrompt({
-  name: 'batchSolvePrompt',
-  model: googleAI.model('gemini-1.5-flash-latest'),
-  input: {schema: BatchSolveInputSchema},
-  output: {schema: BatchSolveOutputSchema},
-  prompt: `You are an expert aptitude test tutor. You will be given a JSON array of questions.
+const batchSolveFlow = defineFlow(
+  {
+    name: 'batchSolveFlow',
+    inputSchema: BatchSolveInputSchema,
+    outputSchema: BatchSolveOutputSchema,
+  },
+  async (input) => {
+    const batchSolvePrompt = ai.definePrompt({
+      name: 'batchSolvePrompt',
+      input: {schema: BatchSolveInputSchema},
+      output: {schema: BatchSolveOutputSchema},
+      prompt: `You are an expert aptitude test tutor. You will be given a JSON array of questions.
 Your task is to solve each question and provide a detailed solution, identify the correct option, and assess the difficulty.
 
 For each question in the input array, you must:
@@ -59,15 +64,8 @@ Process all questions provided in the input JSON and return the results in the '
 Input Questions:
 {{{json questions}}}
 `,
-});
-
-const batchSolveFlow = ai.defineFlow(
-  {
-    name: 'batchSolveFlow',
-    inputSchema: BatchSolveInputSchema,
-    outputSchema: BatchSolveOutputSchema,
-  },
-  async (input) => {
+    });
+    
     const {output} = await batchSolvePrompt(input);
     return output!;
   }

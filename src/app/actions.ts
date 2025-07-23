@@ -6,31 +6,19 @@ import { getSolution, GetSolutionInput, GetSolutionOutput, getTricks, GetTricksI
 import { generateRevisionPlan, GenerateRevisionPlanInput, GenerateRevisionPlanOutput } from '@/ai/flows/revision-planner';
 import { generateTestFeedback, GenerateTestFeedbackInput, GenerateTestFeedbackOutput } from '@/ai/flows/test-feedback';
 import { batchSolveQuestions, BatchSolveInput, BatchSolveOutput } from '@/ai/flows/batch-question-solver';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import type { Document, Question } from '@/lib/types';
 
 
-export async function segregateContentAction(input: Omit<ContentSegregationInput, 'apiKey'> & { fileName: string }): Promise<{ document: Document, questions: Question[] } | { error: string }> {
-  const cookieStore = cookies();
-  const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-          cookies: {
-              get(name: string) {
-                  return cookieStore.get(name)?.value
-              },
-          },
-      }
-  );
-
+export async function segregateContentAction(input: ContentSegregationInput & { fileName: string }): Promise<{ document: Document, questions: Question[] } | { error: string }> {
+  const supabase = createClient();
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error("Authentication error: You must be logged in to upload documents.");
     }
     
+    // Ensure profile exists
     const { data: profile } = await supabase
       .from('profiles')
       .select('id')
@@ -94,15 +82,7 @@ export async function segregateContentAction(input: Omit<ContentSegregationInput
 }
 
 export async function deleteDocumentAction({ documentId }: { documentId: string }): Promise<{ success: true } | { error: string }> {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: { get: (name: string) => cookieStore.get(name)?.value },
-        }
-    );
-
+    const supabase = createClient();
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -128,18 +108,7 @@ export async function deleteDocumentAction({ documentId }: { documentId: string 
 }
 
 export async function renameDocumentAction({ documentId, newName }: { documentId: string; newName: string }): Promise<{ success: true } | { error: string }> {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value
-                },
-            },
-        }
-    );
+    const supabase = createClient();
      try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -225,15 +194,7 @@ export async function generateTestFeedbackAction(input: GenerateTestFeedbackInpu
 export async function batchSolveQuestionsAction(
     input: BatchSolveInput
 ): Promise<BatchSolveOutput | { error: string }> {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: { get: (name: string) => cookieStore.get(name)?.value },
-        }
-    );
-
+    const supabase = createClient();
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -294,15 +255,7 @@ export async function batchSolveQuestionsAction(
 }
 
 export async function getTopicBenchmarkAction({ topic }: { topic: string }): Promise<{ benchmark: number } | { error: string }> {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: { get: (name: string) => cookieStore.get(name)?.value },
-        }
-    );
-
+    const supabase = createClient();
     try {
         const { data, error } = await supabase.rpc('get_topic_benchmark', { topic_text: topic }).single();
 
@@ -331,15 +284,7 @@ export async function getWrongAnswerExplanationAction(input: GetWrongAnswerExpla
 
 
 export async function generateRevisionPlanAction(): Promise<GenerateRevisionPlanOutput | { error: string }> {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: { get: (name: string) => cookieStore.get(name)?.value },
-        }
-    );
-
+    const supabase = createClient();
     try {
          const { data: { user } } = await supabase.auth.getUser();
         if (!user) {

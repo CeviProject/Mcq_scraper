@@ -8,8 +8,7 @@
  * - GenerateRevisionPlanOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/googleai';
+import { defineFlow, ai } from '@/ai/genkit';
 import {z} from 'genkit';
 
 
@@ -26,7 +25,7 @@ export type GenerateRevisionPlanInput = z.infer<typeof GenerateRevisionPlanInput
 
 const RevisionDaySchema = z.object({
     day: z.string().describe("The day of the week (e.g., 'Monday')."),
-    topic: z.string().describe("The topic to focus on for that day."),
+    topic: z.string().describe("The topic to focus on for that day. This MUST be one of the topics from the input performance data, or 'Rest Day'."),
     reason: z.string().describe("A brief, encouraging reason why this topic was chosen for this day."),
 });
 
@@ -40,12 +39,19 @@ export async function generateRevisionPlan(input: GenerateRevisionPlanInput): Pr
   return generateRevisionPlanFlow(input);
 }
 
-const revisionPlannerPrompt = ai.definePrompt({
-    name: 'generateRevisionPlanPrompt',
-    model: googleAI.model('gemini-1.5-flash-latest'),
-    input: {schema: GenerateRevisionPlanInputSchema},
-    output: {schema: GenerateRevisionPlanOutputSchema},
-    prompt: `You are an expert academic coach creating a personalized 7-day revision schedule for a student preparing for aptitude tests.
+
+const generateRevisionPlanFlow = defineFlow(
+    {
+        name: 'generateRevisionPlanFlow',
+        inputSchema: GenerateRevisionPlanInputSchema,
+        outputSchema: GenerateRevisionPlanOutputSchema,
+    },
+    async (input) => {
+        const revisionPlannerPrompt = ai.definePrompt({
+            name: 'generateRevisionPlanPrompt',
+            input: {schema: GenerateRevisionPlanInputSchema},
+            output: {schema: GenerateRevisionPlanOutputSchema},
+            prompt: `You are an expert academic coach creating a personalized 7-day revision schedule for a student preparing for aptitude tests.
 The student's performance data, showing their accuracy on different topics, is provided below.
 
 Performance Data (Topic, Accuracy %):
@@ -61,15 +67,8 @@ Your Task:
 7.  **Provide Encouraging Reasons**: For each study day, provide a short, positive reason for focusing on that topic (e.g., "Let's build a strong foundation here," or "Time to solidify your understanding.").
 8.  **Format the Output**: Return the plan as a JSON array of objects, with each object containing the day, the topic to study, and the reason.
 `,
-});
+        });
 
-const generateRevisionPlanFlow = ai.defineFlow(
-    {
-        name: 'generateRevisionPlanFlow',
-        inputSchema: GenerateRevisionPlanInputSchema,
-        outputSchema: GenerateRevisionPlanOutputSchema,
-    },
-    async (input) => {
         const {output} = await revisionPlannerPrompt(input);
         return output!;
     }

@@ -8,8 +8,7 @@
  * - GenerateTestFeedbackOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/googleai';
+import { defineFlow, ai } from '@/ai/genkit';
 import {z} from 'genkit';
 
 const TestQuestionResultSchema = z.object({
@@ -35,12 +34,19 @@ export async function generateTestFeedback(input: GenerateTestFeedbackInput): Pr
   return generateTestFeedbackFlow(input);
 }
 
-const feedbackPrompt = ai.definePrompt({
-    name: 'generateTestFeedbackPrompt',
-    model: googleAI.model('gemini-1.5-flash-latest'),
-    input: {schema: GenerateTestFeedbackInputSchema},
-    output: {schema: GenerateTestFeedbackOutputSchema},
-    prompt: `You are an expert aptitude test coach. A student has just completed a mock test. Analyze their performance based on the results provided and give them constructive feedback.
+
+const generateTestFeedbackFlow = defineFlow(
+    {
+        name: 'generateTestFeedbackFlow',
+        inputSchema: GenerateTestFeedbackInputSchema,
+        outputSchema: GenerateTestFeedbackOutputSchema,
+    },
+    async (input) => {
+        const feedbackPrompt = ai.definePrompt({
+            name: 'generateTestFeedbackPrompt',
+            input: {schema: GenerateTestFeedbackInputSchema},
+            output: {schema: GenerateTestFeedbackOutputSchema},
+            prompt: `You are an expert aptitude test coach. A student has just completed a mock test. Analyze their performance based on the results provided and give them constructive feedback.
 
 The user's test results are provided as a JSON object. For each question, you'll see the topic, their answer, the correct answer, and whether they got it right.
 
@@ -51,15 +57,8 @@ Your tasks are:
 1.  **Write Overall Feedback**: Start with an encouraging tone. Calculate the user's score (number of correct answers out of total questions). Provide a summary of their performance. Offer general tips for improvement. Format this as Markdown.
 2.  **Identify Areas of Weakness**: Based on the topics of the questions they answered incorrectly, identify the topics they seem to be struggling with. List these topics in the 'areasOfWeakness' field. If they got everything right, return an empty array.
 `,
-});
-
-const generateTestFeedbackFlow = ai.defineFlow(
-    {
-        name: 'generateTestFeedbackFlow',
-        inputSchema: GenerateTestFeedbackInputSchema,
-        outputSchema: GenerateTestFeedbackOutputSchema,
-    },
-    async (input) => {
+        });
+        
         const {output} = await feedbackPrompt(input);
         return output!;
     }

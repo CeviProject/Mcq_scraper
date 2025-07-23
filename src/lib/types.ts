@@ -17,7 +17,7 @@ export type AppUser = User & {
 export type Profile = {
     id: string;
     username: string;
-    gemini_api_key?: string;
+    gemini_api_key?: string | null;
 };
 
 export type Session = import('@supabase/supabase-js').Session;

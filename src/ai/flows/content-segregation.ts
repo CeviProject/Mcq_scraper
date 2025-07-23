@@ -9,8 +9,7 @@
  * - ContentSegregationOutput - The return type for the contentSegregation function.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/googleai';
+import { defineFlow, ai } from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ContentSegregationInputSchema = z.object({
@@ -39,12 +38,19 @@ export async function contentSegregation(input: ContentSegregationInput): Promis
   return contentSegregationFlow(input);
 }
 
-const contentSegregationPrompt = ai.definePrompt({
-  name: 'contentSegregationPrompt',
-  model: googleAI.model('gemini-1.5-flash-latest'),
-  input: {schema: ContentSegregationInputSchema},
-  output: {schema: ContentSegregationOutputSchema},
-  prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and meticulously separate it into two categories: theory and questions.
+
+const contentSegregationFlow = defineFlow(
+  {
+    name: 'contentSegregationFlow',
+    inputSchema: ContentSegregationInputSchema,
+    outputSchema: ContentSegregationOutputSchema,
+  },
+  async (input) => {
+    const contentSegregationPrompt = ai.definePrompt({
+      name: 'contentSegregationPrompt',
+      input: {schema: ContentSegregationInputSchema},
+      output: {schema: ContentSegregationOutputSchema},
+      prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and meticulously separate it into two categories: theory and questions.
 
 The PDF content is provided below:
 {{media url=pdfDataUri}}
@@ -69,15 +75,8 @@ Your goal is to be exhaustive. **Assume everything in the document is either the
 
 Return the extracted theory and the array of questions in the specified structured format.
       `,
-});
-
-const contentSegregationFlow = ai.defineFlow(
-  {
-    name: 'contentSegregationFlow',
-    inputSchema: ContentSegregationInputSchema,
-    outputSchema: ContentSegregationOutputSchema,
-  },
-  async (input) => {
+    });
+    
     const {output} = await contentSegregationPrompt(input);
     return output!;
   }
