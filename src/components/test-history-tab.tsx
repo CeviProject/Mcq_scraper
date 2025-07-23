@@ -149,7 +149,7 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
                     <CardTitle className="flex items-center gap-2 text-base"><BarChart className="h-5 w-5"/>Performance by Topic</CardTitle>
                      <CardDescription className="flex items-center gap-1.5 text-xs"><Users className="h-3 w-3" /> Compare your results with the peer average.</CardDescription>
                 </CardHeader>
-                <CardContent className="h-[250px] pl-0">
+                <CardContent className="h-[250px]">
                    {chartData.length === 0 ? (
                        <div className="flex items-center justify-center h-full text-muted-foreground">
                            <p>No topic data for this test.</p>
@@ -161,7 +161,7 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
                        </div>
                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                        <RechartsBarChart data={chartData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 20 }}>
+                        <RechartsBarChart data={chartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 20 }}>
                             <XAxis type="number" hide domain={[0, 100]}/>
                             <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
                             <Tooltip 
