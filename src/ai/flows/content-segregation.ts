@@ -10,6 +10,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 const ContentSegregationInputSchema = z.object({
@@ -40,6 +41,7 @@ export async function contentSegregation(input: ContentSegregationInput): Promis
 
 const contentSegregationPrompt = ai.definePrompt({
   name: 'contentSegregationPrompt',
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: {schema: ContentSegregationInputSchema},
   output: {schema: ContentSegregationOutputSchema},
   prompt: `You are an expert in parsing and understanding PDF documents, especially those containing aptitude test materials. Your task is to analyze the content of the uploaded PDF and meticulously separate it into two categories: theory and questions.

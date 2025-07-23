@@ -9,6 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 const QuestionToSolveSchema = z.object({
@@ -41,6 +42,7 @@ export async function batchSolveQuestions(input: BatchSolveInput): Promise<Batch
 
 const batchSolvePrompt = ai.definePrompt({
   name: 'batchSolvePrompt',
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: {schema: BatchSolveInputSchema},
   output: {schema: BatchSolveOutputSchema},
   prompt: `You are an expert aptitude test tutor. You will be given a JSON array of questions.

@@ -9,6 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 const TestQuestionResultSchema = z.object({
@@ -36,6 +37,7 @@ export async function generateTestFeedback(input: GenerateTestFeedbackInput): Pr
 
 const feedbackPrompt = ai.definePrompt({
     name: 'generateTestFeedbackPrompt',
+    model: googleAI.model('gemini-1.5-flash-latest'),
     input: {schema: GenerateTestFeedbackInputSchema},
     output: {schema: GenerateTestFeedbackOutputSchema},
     prompt: `You are an expert aptitude test coach. A student has just completed a mock test. Analyze their performance based on the results provided and give them constructive feedback.

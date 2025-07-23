@@ -9,6 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 
@@ -41,6 +42,7 @@ export async function generateRevisionPlan(input: GenerateRevisionPlanInput): Pr
 
 const revisionPlannerPrompt = ai.definePrompt({
     name: 'generateRevisionPlanPrompt',
+    model: googleAI.model('gemini-1.5-flash-latest'),
     input: {schema: GenerateRevisionPlanInputSchema},
     output: {schema: GenerateRevisionPlanOutputSchema},
     prompt: `You are an expert academic coach creating a personalized 7-day revision schedule for a student preparing for aptitude tests.

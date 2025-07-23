@@ -10,6 +10,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 // Get Solution Flow
@@ -33,6 +34,7 @@ export async function getSolution(input: GetSolutionInput): Promise<GetSolutionO
 
 const getSolutionPrompt = ai.definePrompt({
     name: 'getSolutionPrompt',
+    model: googleAI.model('gemini-1.5-flash-latest'),
     input: {schema: GetSolutionInputSchema},
     output: {schema: GetSolutionOutputSchema},
     prompt: `You are an expert aptitude test tutor. A student needs help with a question.
@@ -107,6 +109,7 @@ export async function askFollowUp(input: AskFollowUpInput): Promise<AskFollowUpO
 
 const askFollowUpPrompt = ai.definePrompt({
     name: 'askFollowUpPrompt',
+    model: googleAI.model('gemini-1.5-flash-latest'),
     input: { schema: AskFollowUpInputSchema },
     output: { schema: AskFollowUpOutputSchema },
     prompt: `You are an expert aptitude test tutor engaged in a conversation with a student.
@@ -165,6 +168,7 @@ export async function getTricks(input: GetTricksInput): Promise<GetTricksOutput>
 
 const getTricksPrompt = ai.definePrompt({
     name: 'getTricksPrompt',
+    model: googleAI.model('gemini-1.5-flash-latest'),
     input: {schema: GetTricksInputSchema},
     output: {schema: GetTricksOutputSchema},
     prompt: `You are an expert aptitude test coach. Your goal is to provide highly specific and actionable advice for solving a certain category of problem, based on a single sample question.
@@ -214,6 +218,7 @@ export async function getWrongAnswerExplanation(input: GetWrongAnswerExplanation
 
 const wrongAnswerPrompt = ai.definePrompt({
     name: 'getWrongAnswerExplanationPrompt',
+    model: googleAI.model('gemini-1.5-flash-latest'),
     input: {schema: GetWrongAnswerExplanationInputSchema},
     output: {schema: GetWrongAnswerExplanationOutputSchema},
     prompt: `You are a patient and insightful AI tutor. A student has answered a question incorrectly and needs to understand their mistake.
