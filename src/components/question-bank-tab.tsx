@@ -49,26 +49,28 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, documents
     });
   };
 
+  const GLASS_CARD = 'bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-white/30 dark:border-zinc-800/40 shadow-2xl';
+
   if (questions.length === 0) {
     return (
-        <Card className="flex flex-col items-center justify-center py-20 text-center">
+        <Card className={`${GLASS_CARD} flex flex-col items-center justify-center py-20 text-center`}>
             <CardHeader>
-                <div className="mx-auto bg-secondary p-4 rounded-full">
-                    <ListChecks className="h-12 w-12 text-muted-foreground" />
+                <div className="mx-auto bg-secondary p-4 rounded-full shadow-lg">
+                    <ListChecks className="h-12 w-12 text-primary" />
                 </div>
-                <CardTitle className="mt-4">Your Question Bank is Empty</CardTitle>
-                <CardDescription>Upload PDFs on the Upload tab. Questions will appear here.</CardDescription>
+                <CardTitle className="mt-4 text-2xl font-bold text-primary drop-shadow">Your Question Bank is Empty</CardTitle>
+                <CardDescription className="text-base text-muted-foreground">Upload PDFs on the Upload tab. Questions will appear here.</CardDescription>
             </CardHeader>
         </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="space-y-8">
+      <Card className={`${GLASS_CARD} mb-2`}>
         <CardHeader>
-          <CardTitle>Filter Questions</CardTitle>
-          <CardDescription>Refine the question list to focus your practice.</CardDescription>
+          <CardTitle className="text-xl font-bold text-primary drop-shadow">Filter Questions</CardTitle>
+          <CardDescription className="text-base text-muted-foreground">Refine the question list to focus your practice.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-2">
@@ -110,7 +112,7 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, documents
                         key={file}
                         checked={sourceFileFilter.includes(file!)}
                         onCheckedChange={checked => {
-                            setSourceFileFilter(prev => 
+                            setSourceFileFilter(prev =>
                                 checked ? [...prev, file!] : prev.filter(f => f !== file)
                             )
                         }}
@@ -135,8 +137,8 @@ export default function QuestionBankTab({ questions, onQuestionUpdate, documents
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        <h3 className="text-xl font-semibold">
+      <div className="space-y-6 bg-gradient-to-br from-white/40 via-background/60 to-primary/10 dark:from-zinc-900/40 dark:to-background/60 rounded-2xl p-6 shadow-inner">
+        <h3 className="text-2xl font-semibold text-primary mb-2">
           {filteredQuestions.length} Question{filteredQuestions.length === 1 ? '' : 's'} Found
         </h3>
         {filteredQuestions.map(q => {

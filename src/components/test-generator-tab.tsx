@@ -286,6 +286,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   const { toast } = useToast();
   const supabase = useMemo(() => createClient(), []);
   const difficultyOptions = ['Easy', 'Medium', 'Hard'];
+  const GLASS_CARD = 'bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border border-white/30 dark:border-zinc-800/40 shadow-xl transition-all duration-300';
 
   const handleFinishTest = useCallback(async () => {
       setStatus('finishing');
@@ -489,11 +490,11 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
 
   if (questions.length === 0) {
     return (
-        <Card className="flex flex-col items-center justify-center py-20 text-center">
+        <Card className={`${GLASS_CARD} flex flex-col items-center justify-center py-20 text-center`}> 
             <CardHeader>
-                <div className="mx-auto bg-secondary p-4 rounded-full"><FileText className="h-12 w-12 text-muted-foreground" /></div>
-                <CardTitle className="mt-4">Test Generator is Waiting</CardTitle>
-                <CardDescription>Upload PDFs and generate solutions for questions to start creating mock tests.</CardDescription>
+                <div className="mx-auto bg-secondary p-4 rounded-full shadow-lg"><FileText className="h-12 w-12 text-primary" /></div>
+                <CardTitle className="mt-4 text-2xl font-bold text-primary drop-shadow">Test Generator is Waiting</CardTitle>
+                <CardDescription className="text-base text-muted-foreground">Upload PDFs and generate solutions for questions to start creating mock tests.</CardDescription>
             </CardHeader>
         </Card>
     );
@@ -501,11 +502,11 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
 
   if (status === 'finishing') {
     return (
-      <Card className="flex flex-col items-center justify-center py-20 text-center">
+      <Card className={`${GLASS_CARD} flex flex-col items-center justify-center py-20 text-center`}> 
         <CardHeader>
             <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto" />
-            <CardTitle className="mt-4">Generating Your Results...</CardTitle>
-            <CardDescription>Please wait while we analyze your performance and generate AI feedback.</CardDescription>
+            <CardTitle className="mt-4 text-2xl font-bold text-primary drop-shadow">Generating Your Results...</CardTitle>
+            <CardDescription className="text-base text-muted-foreground">Please wait while we analyze your performance and generate AI feedback.</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -515,12 +516,12 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
     const currentQuestion = generatedTest[currentQuestionIndex];
     const progress = ((currentQuestionIndex) / generatedTest.length) * 100;
     return (
-        <Card>
+        <Card className={`${GLASS_CARD}`}> 
             <CardHeader>
                 <div className="flex justify-between items-center">
                     <div>
-                        <CardTitle>Mock Test in Progress</CardTitle>
-                        <CardDescription>Question {currentQuestionIndex + 1} of {generatedTest.length}</CardDescription>
+                        <CardTitle className="text-xl font-bold text-primary drop-shadow">Mock Test in Progress</CardTitle>
+                        <CardDescription className="text-base text-muted-foreground">Question {currentQuestionIndex + 1} of {generatedTest.length}</CardDescription>
                     </div>
                      <div className="flex items-center gap-2 text-lg font-mono text-right text-primary">
                         <Clock className="h-5 w-5" />
@@ -534,7 +535,7 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
                 {currentQuestion.options && (
                     <RadioGroup value={userAnswers[currentQuestion.id]} onValueChange={(val) => handleAnswerChange(currentQuestion.id, val)} className="space-y-2">
                         {currentQuestion.options.map((option, index) => (
-                            <Label key={index} htmlFor={`${currentQuestion.id}-option-${index}`} className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-muted has-[input:checked]:bg-primary/10 has-[input:checked]:border-primary">
+                            <Label key={index} htmlFor={`${currentQuestion.id}-option-${index}`} className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-muted has-[input:checked]:bg-primary/10 has-[input:checked]:border-primary transition-all">
                                 <RadioGroupItem value={option} id={`${currentQuestion.id}-option-${index}`} />
                                 {option}
                             </Label>
@@ -555,14 +556,14 @@ export default function TestGeneratorTab({ questions, onTestComplete, onQuestion
   }
 
   if (status === 'results' && completedTest) {
-    return <TestResults testResult={completedTest} onRestart={handleRestart} />
+    return <div className="space-y-8 bg-gradient-to-br from-white/40 via-background/60 to-primary/10 dark:from-zinc-900/40 dark:to-background/60 rounded-2xl p-6 shadow-inner"><TestResults testResult={completedTest} onRestart={handleRestart} /></div>
   }
 
   return (
-    <Card>
+    <Card className={`${GLASS_CARD}`}> 
       <CardHeader>
-        <CardTitle>Create a Mock Test</CardTitle>
-        <CardDescription>Set your criteria and generate a custom practice test.</CardDescription>
+        <CardTitle className="text-2xl font-bold text-primary drop-shadow">Create a Mock Test</CardTitle>
+        <CardDescription className="text-base text-muted-foreground">Set your criteria and generate a custom practice test.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">

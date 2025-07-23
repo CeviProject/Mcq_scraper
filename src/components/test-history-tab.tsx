@@ -19,6 +19,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { format, formatDistanceToNow } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { LineChart, Line, PieChart, Pie, Cell as PieCell, RadialBarChart, RadialBar } from 'recharts';
+import { Tooltip as RechartsTooltip, Legend as RechartsLegend, Bar as RechartsBar } from 'recharts';
 
 
 function WhyWrongDialog({ question, userAnswer }: { question: Question, userAnswer: string }) {
@@ -255,38 +257,125 @@ function TestResultDetails({ test, allQuestions }: { test: Test & { test_attempt
 
 export default function TestHistoryTab({ allQuestions, testHistory }: { allQuestions: Question[], testHistory: (Test & { test_attempts: TestAttempt[] })[] }) {
   
+  const GLASS_CARD = 'bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border border-white/30 dark:border-zinc-800/40 shadow-xl transition-all duration-300';
+  const MODERN_COLORS = ['#6366F1', '#06B6D4', '#F59E42', '#F43F5E', '#10B981', '#A21CAF'];
+
+  // --- Overall Stats Data ---
+  // Score trend (line chart)
+  const scoreTrend = testHistory.map(test => ({
+    date: test.created_at ? format(new Date(test.created_at), 'MMM d') : '',
+    score: Math.round((test.score / test.total) * 100),
+  }));
+  // Topic distribution (pie chart)
+  const topicCounts: Record<string, number> = {};
+  testHistory.forEach(test => {
+    test.test_attempts.forEach(attempt => {
+      const q = allQuestions.find(q => q.id === attempt.question_id);
+      if (q && q.topic) topicCounts[q.topic] = (topicCounts[q.topic] || 0) + 1;
+    });
+  });
+  const topicDist = Object.entries(topicCounts).map(([name, value]) => ({ name, value }));
+  // High score completion (radial bar)
+  const highScorePct = testHistory.length > 0 ? Math.round((testHistory.filter(t => t.score / t.total >= 0.7).length / testHistory.length) * 100) : 0;
+  // Average score
+  const avgScore = testHistory.length > 0 ? Math.round(testHistory.reduce((acc, t) => acc + (t.score / t.total), 0) / testHistory.length * 100) : 0;
+
+  // --- More Analytics ---
+  // Average accuracy per topic (bar chart)
+  const topicAccuracy: { name: string, accuracy: number }[] = [];
+  const topicCorrect: Record<string, { correct: number, total: number }> = {};
+  testHistory.forEach(test => {
+    test.test_attempts.forEach(attempt => {
+      const q = allQuestions.find(q => q.id === attempt.question_id);
+      if (q && q.topic) {
+        if (!topicCorrect[q.topic]) topicCorrect[q.topic] = { correct: 0, total: 0 };
+        topicCorrect[q.topic].total++;
+        if (attempt.is_correct) topicCorrect[q.topic].correct++;
+      }
+    });
+  });
+  for (const topic in topicCorrect) {
+    topicAccuracy.push({ name: topic, accuracy: Math.round((topicCorrect[topic].correct / topicCorrect[topic].total) * 100) });
+  }
+
   if (testHistory.length === 0) {
     return (
-        <Card className="flex flex-col items-center justify-center py-20 text-center">
+        <Card className={`${GLASS_CARD} flex flex-col items-center justify-center py-20 text-center`}> 
             <CardHeader>
-                <div className="mx-auto bg-secondary p-4 rounded-full"><History className="h-12 w-12 text-muted-foreground" /></div>
-                <CardTitle className="mt-4">No Test History Found</CardTitle>
-                <CardDescription>Complete a mock test from the "Mock Test" tab to see your history and analytics here.</CardDescription>
+                <div className="mx-auto bg-secondary p-4 rounded-full shadow-lg"><History className="h-12 w-12 text-primary" /></div>
+                <CardTitle className="mt-4 text-2xl font-bold text-primary drop-shadow">No Test History Found</CardTitle>
+                <CardDescription className="text-base text-muted-foreground">Complete a mock test from the "Mock Test" tab to see your history and analytics here.</CardDescription>
             </CardHeader>
         </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-       <Card>
+    <div className="space-y-8">
+      {/* Overall Stats Section */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8 bg-gradient-to-br from-white/40 via-background/60 to-primary/10 dark:from-zinc-900/40 dark:to-background/60 rounded-2xl p-6 shadow-inner">
+        {/* Score Trend Line Chart */}
+        <div className={`${GLASS_CARD} p-4 flex flex-col items-center justify-center`}>
+          <h3 className="text-lg font-bold text-primary mb-2">Score Trend</h3>
+          <LineChart width={220} height={120} data={scoreTrend} className="w-full">
+            <Line type="monotone" dataKey="score" stroke="#6366F1" strokeWidth={3} dot={{ r: 4, fill: '#06B6D4', stroke: '#fff', strokeWidth: 2 }} isAnimationActive animationDuration={900} />
+            <RechartsTooltip contentStyle={{background: 'rgba(30,41,59,0.95)', color: '#fff', borderRadius: 8, border: '1px solid #334155'}} labelStyle={{color:'#a5b4fc'}} itemStyle={{color:'#fff'}} />
+            <RechartsLegend wrapperStyle={{fontSize: '0.9rem'}} />
+          </LineChart>
+        </div>
+        {/* Topic Distribution Pie Chart */}
+        <div className={`${GLASS_CARD} p-4 flex flex-col items-center justify-center`}>
+          <h3 className="text-lg font-bold text-primary mb-2">Topic Distribution</h3>
+          <PieChart width={180} height={180} className="w-full">
+            <Pie data={topicDist} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={40} paddingAngle={3} isAnimationActive animationDuration={900} >
+              {topicDist.map((entry, idx) => (
+                <PieCell key={`cell-${idx}`} fill={MODERN_COLORS[idx % MODERN_COLORS.length]} />
+              ))}
+            </Pie>
+            <RechartsTooltip formatter={(v, n) => [`${v}`, n]} contentStyle={{background: 'rgba(30,41,59,0.95)', color: '#fff', borderRadius: 8, border: '1px solid #334155'}} />
+            <RechartsLegend wrapperStyle={{fontSize: '0.9rem'}} />
+          </PieChart>
+        </div>
+        {/* High Score Completion Radial Bar */}
+        <div className={`${GLASS_CARD} p-4 flex flex-col items-center justify-center relative`}>
+          <h3 className="text-lg font-bold text-primary mb-2">High Score Completion</h3>
+          <RadialBarChart width={120} height={120} innerRadius="80%" outerRadius="100%" data={[{ name: 'Completion', value: highScorePct }]} startAngle={90} endAngle={-270} >
+            <RadialBar minAngle={15} background clockWise dataKey="value" fill="#10B981" cornerRadius={20} isAnimationActive animationDuration={900} label={{ position: 'center', fill: '#10B981', fontSize: 24, fontWeight: 700, formatter: () => `${highScorePct}%` }} />
+            <RechartsTooltip formatter={(v) => `${v}%`} contentStyle={{background: 'rgba(30,41,59,0.95)', color: '#fff', borderRadius: 8, border: '1px solid #334155'}} />
+          </RadialBarChart>
+          <p className="text-xs text-muted-foreground mt-2">Tests with ≥70% score</p>
+        </div>
+        {/* Average Accuracy by Topic Bar Chart */}
+        <div className={`${GLASS_CARD} p-4 flex flex-col items-center justify-center`}>
+          <h3 className="text-lg font-bold text-primary mb-2">Avg. Accuracy by Topic</h3>
+          <RechartsBarChart width={220} height={120} data={topicAccuracy} layout="vertical" margin={{ left: 20, right: 20 }}>
+            <XAxis type="number" domain={[0, 100]} hide />
+            <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+            <RechartsTooltip formatter={(v) => `${v}%`} contentStyle={{background: 'rgba(30,41,59,0.95)', color: '#fff', borderRadius: 8, border: '1px solid #334155'}} />
+            <RechartsLegend wrapperStyle={{fontSize: '0.9rem'}} />
+            <RechartsBar dataKey="accuracy" fill="#6366F1" radius={[8, 8, 8, 8]} barSize={18} isAnimationActive animationDuration={900} />
+          </RechartsBarChart>
+        </div>
+      </div>
+      {/* Test History Accordion */}
+      <Card className={`${GLASS_CARD}`}> 
         <CardHeader>
-          <CardTitle>Test History</CardTitle>
-          <CardDescription>Review your past performance. Click on any test to see a detailed breakdown.</CardDescription>
+          <CardTitle className="text-2xl font-bold text-primary drop-shadow">Test History</CardTitle>
+          <CardDescription className="text-base text-muted-foreground">Review your past performance. Click on any test to see a detailed breakdown.</CardDescription>
         </CardHeader>
         <CardContent className="p-0 sm:p-2 md:p-4">
             <Accordion type="single" collapsible className="w-full">
             {testHistory.map(test => (
-                <AccordionItem value={test.id} key={test.id}>
-                    <AccordionTrigger className="hover:no-underline px-4 py-3 hover:bg-muted/50 rounded-md">
+                <AccordionItem value={test.id} key={test.id} className="mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-white/40 via-background/60 to-primary/10 dark:from-zinc-900/40 dark:to-background/60 shadow-inner">
+                    <AccordionTrigger className="hover:no-underline px-4 py-3 hover:bg-primary/10 rounded-md transition-all">
                         <div className="flex justify-between items-center w-full">
                             <div>
-                                <h4 className="font-semibold text-base text-left">Test from {format(new Date(test.created_at), 'MMMM d, yyyy')}</h4>
+                                <h4 className="font-semibold text-base text-left text-primary">Test from {format(new Date(test.created_at), 'MMMM d, yyyy')}</h4>
                                 <p className="text-sm text-muted-foreground font-normal text-left">{formatDistanceToNow(new Date(test.created_at), { addSuffix: true })}</p>
                             </div>
                             <div className="text-right flex items-center gap-4">
                                  <p className="text-lg font-bold">{test.score}/{test.total}</p>
-                                <Badge variant={test.score/test.total >= 0.7 ? "default" : "destructive"} className="text-base">
+                                <Badge variant={test.score/test.total >= 0.7 ? "default" : "destructive"} className="text-base px-3 py-1 rounded-full">
                                     {((test.score / test.total) * 100).toFixed(0)}%
                                 </Badge>
                             </div>

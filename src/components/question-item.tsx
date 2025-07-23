@@ -120,10 +120,12 @@ export function QuestionItem({ question, onQuestionUpdate, theory, uiState, setU
     setUiState(question.id, { userSelectedOption: option });
   };
   
+  const GLASS_CARD = 'bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border border-white/30 dark:border-zinc-800/40 shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.01]';
+
   return (
-    <Card className="overflow-hidden">
+    <Card className={`${GLASS_CARD} overflow-hidden mb-4`}> 
       <CardContent className="p-6">
-        <p className="text-foreground mb-4 whitespace-pre-wrap">{question.text}</p>
+        <p className="text-lg text-foreground mb-4 whitespace-pre-wrap font-medium">{question.text}</p>
         {hasOptions && (
           <RadioGroup 
             className="mb-4 space-y-2" 
@@ -134,16 +136,16 @@ export function QuestionItem({ question, onQuestionUpdate, theory, uiState, setU
             {question.options?.map((option, index) => {
               const isCorrect = normalizeOption(question.correct_option || '') === normalizeOption(option);
               const isSelected = uiState.userSelectedOption === option;
-              
               return (
                 <div key={index} className="flex items-center space-x-2">
                   <RadioGroupItem value={option} id={`${question.id}-option-${index}`} />
                   <Label 
                     htmlFor={`${question.id}-option-${index}`}
                     className={cn(
-                      "cursor-pointer flex items-center gap-2",
-                      isVerified && isCorrect && "text-green-500 font-bold",
-                      isVerified && isSelected && !isCorrect && "text-red-500 font-bold"
+                      "cursor-pointer flex items-center gap-2 text-base px-2 py-1 rounded-lg transition-colors",
+                      isVerified && isCorrect && "text-green-600 bg-green-100 dark:bg-green-900/30 font-bold",
+                      isVerified && isSelected && !isCorrect && "text-red-600 bg-red-100 dark:bg-red-900/30 font-bold",
+                      !isVerified && isSelected && "bg-primary/10 text-primary font-semibold"
                     )}
                   >
                     {option}
@@ -156,9 +158,9 @@ export function QuestionItem({ question, onQuestionUpdate, theory, uiState, setU
           </RadioGroup>
         )}
         <div className="flex flex-wrap gap-2 mb-4">
-          <Badge variant="secondary"><File className="w-3 h-3 mr-1"/>{question.sourceFile}</Badge>
-          <Badge variant="outline">Topic: {question.topic}</Badge>
-          <Badge variant="outline">{question.difficulty}</Badge>
+          <Badge variant="secondary" className="bg-primary/10 text-primary font-semibold"><File className="w-3 h-3 mr-1"/>{question.sourceFile}</Badge>
+          <Badge variant="outline" className="bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300">Topic: {question.topic}</Badge>
+          <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{question.difficulty}</Badge>
         </div>
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row gap-4 items-center bg-muted/50 p-4 rounded-b-lg">
